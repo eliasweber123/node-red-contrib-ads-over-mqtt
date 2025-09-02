@@ -59,7 +59,8 @@ module.exports = function (RED) {
       const data = message.slice(46, 46 + len);
 
       delete node.pendingRequests[invokeId];
-      pending.send({ payload: data, symbol: pending.symbol, invokeId, result });
+      const out = { payload: data, symbol: pending.symbol, invokeId, result };
+      pending.send([out, null]);
       pending.done();
     });
 
@@ -105,6 +106,11 @@ module.exports = function (RED) {
       tcpHeader.writeUInt32LE(amsHeader.length + adsRw.length, 2);
 
       const frame = Buffer.concat([tcpHeader, amsHeader, adsRw]);
+
+      const frameHex = frame.toString("hex");
+      node.debug(`Frame: ${frameHex}`);
+      const debugMsg = { payload: frameHex };
+      send([null, debugMsg]);
 
       node.pendingRequests[invokeId] = { symbol, send, done };
       node.connection.client.publish(reqTopic, frame);
