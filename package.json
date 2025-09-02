@@ -1,0 +1,20 @@
+{
+  "name": "node-red-contrib-ads-over-mqtt",
+  "version": "0.1.0",
+  "description": "Node-RED nodes to communicate with TwinCAT ADS over MQTT",
+  "license": "MIT",
+  "keywords": ["node-red", "ads", "mqtt", "twincat"],
+  "node-red": {
+    "nodes": {
+      "ads-client-connection": "nodes/ads-client-connection.js",
+      "ads-client-read-symbol": "nodes/ads-client-read-symbol.js",
+      "ads-client-write-symbol": "nodes/ads-client-write-symbol.js"
+    }
+  },
+  "dependencies": {
+    "mqtt": "^4.3.7"
+  },
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0"
+  }
+}
