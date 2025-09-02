@@ -14,14 +14,59 @@ ADS symbols using MQTT messages.
 - **ads-over-mqtt-write-symbols** – writes a value from `msg.payload` to the
   specified ADS symbol.
 
-These nodes publish and subscribe to the following MQTT topics:
+These nodes publish requests to `VirtualAmsNetwork1/<targetAmsNetId>/ams` and
+listen for responses on `VirtualAmsNetwork1/<targetAmsNetId>/ams/res`. Messages
+on the old `<clientId>/<targetAmsNetId>/ams` topics are still accepted but will
+produce a warning.
 
-- `ads/read` – request a symbol value
-- `ads/write` – write a symbol value
-- `ads/response` – responses for read requests
+Payloads are raw ADS/AMS frames. Within Node-RED flows they are represented as
+Buffers. When serialising to JSON (for example for MQTT nodes), the Buffer can
+be expressed as an object
 
-The exact wire protocol may be adapted to suit the ADS-over-MQTT gateway you
-are using.
+```json
+{"type": "ams", "encoding": "base64", "data": "<base64>"}
+```
+
+### Example
+
+```js
+// Read 4 bytes from symbol 'MAIN.myVar'
+msg.symbol = 'MAIN.myVar';
+msg.readLength = 4;
+return msg;
+```
+
+If you need to inject a frame manually:
+
+```js
+// Request frame as Buffer
+const req = Buffer.from(
+  '00003b00000006050403020153030102030405065303090004001b000000000000000100000003f0000000000000040000000b0000004d41494e2e6d7956617200',
+  'hex'
+);
+msg.payload = req; // Buffer form
+return msg;
+```
+
+The same frame encoded in Base64:
+
+```json
+{"type":"ams","encoding":"base64","data":"AAA7AAAABgUEAwIBUwMBAgMEBQZTAwkABAAbAAAAAAAAAAEAAAAD8AAAAAAAAAQAAAALAAAATUFJTi5teVZhcgA="}
+```
+
+An example response for the above request:
+
+```json
+{
+  "type": "ams",
+  "encoding": "base64",
+  "data": "AAAsAAAAAQIDBAUGUwMGBQQDAgFTAwkABQAMAAAAAAAAAAEAAAAAAAAABAAAAHhWNBI="
+}
+```
+
+The read node outputs the response data in `msg.payload` as a Buffer. The write
+node forwards an empty Buffer on success. Both nodes include the `invokeId` and
+ADS result code in the message.
 
 ## Development
 
