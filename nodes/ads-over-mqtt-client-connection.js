@@ -13,9 +13,14 @@ module.exports = function (RED) {
     node.port = Number(config.port) || 851;
 
     const { username, password } = node.credentials || {};
-    const clientId =
-      (config.clientId && String(config.clientId).trim()) ||
-      "node-red-ads-" + Math.random().toString(16).slice(2, 10);
+    const rawClientId = (config.clientId || "").trim();
+    if (!rawClientId) {
+      node.warn(
+        "ads-over-mqtt-client-connection: clientId (network name) is empty"
+      );
+    }
+    node.clientId =
+      rawClientId || "node-red-ads-" + Math.random().toString(16).slice(2, 10);
 
     if (!node.brokerUrl) {
       node.status({ fill: "red", shape: "ring", text: "missing brokerUrl" });
@@ -24,7 +29,7 @@ module.exports = function (RED) {
     }
 
     const options = {
-      clientId,
+      clientId: node.clientId,
       username,
       password,
       keepalive: 60,
@@ -82,6 +87,7 @@ module.exports = function (RED) {
         amsNetId: node.amsNetId,
         targetAmsNetId: node.targetAmsNetId,
         port: node.port,
+        clientId: node.clientId,
         client: node.client,
       };
     };

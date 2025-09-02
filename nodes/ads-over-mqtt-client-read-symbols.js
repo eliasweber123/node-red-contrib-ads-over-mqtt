@@ -10,10 +10,18 @@ module.exports = function(RED) {
       return;
     }
 
+    const reqTopic = `${node.connection.clientId}/${node.connection.targetAmsNetId}/ads/req`;
+    const resTopic = `${node.connection.clientId}/${node.connection.targetAmsNetId}/ams/res`;
+
+    if (!node.connection._subscribedRes) {
+      node.connection.client.subscribe(resTopic);
+      node.connection._subscribedRes = true;
+    }
+
     node.connection.client.on('message', function(topic, message) {
       try {
         const res = JSON.parse(message.toString());
-        if (topic === 'ads/response' && res.symbol === node.pending) {
+        if (topic === resTopic && res.symbol === node.pending) {
           node.pending = null;
           node.send({payload: res.value, symbol: res.symbol});
         }
@@ -35,7 +43,7 @@ module.exports = function(RED) {
         port: node.connection.port,
         symbol
       };
-      node.connection.client.publish('ads/read', JSON.stringify(req));
+      node.connection.client.publish(reqTopic, JSON.stringify(req));
       done();
     });
   }
