@@ -106,6 +106,8 @@ module.exports = function (RED) {
 
       const frame = Buffer.concat([tcpHeader, amsHeader, adsRw]);
 
+      node.debug(`Frame: ${frame.toString('hex')}`);
+
       node.pendingRequests[invokeId] = { symbol, send, done };
       node.connection.client.publish(reqTopic, frame);
     });
