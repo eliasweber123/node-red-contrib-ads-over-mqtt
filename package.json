@@ -6,9 +6,9 @@
   "keywords": ["node-red", "ads", "mqtt", "twincat"],
   "node-red": {
     "nodes": {
-      "ads-client-connection": "nodes/ads-client-connection.js",
-      "ads-client-read-symbol": "nodes/ads-client-read-symbol.js",
-      "ads-client-write-symbol": "nodes/ads-client-write-symbol.js"
+      "ads-over-mqtt-client-connection": "nodes/ads-over-mqtt-client-connection.js",
+      "ads-over-mqtt-client-read-symbols": "nodes/ads-over-mqtt-client-read-symbols.js",
+      "ads-over-mqtt-write-symbols": "nodes/ads-over-mqtt-write-symbols.js"
     }
   },
   "dependencies": {

@@ -1,5 +1,5 @@
 <script type="text/javascript">
-  RED.nodes.registerType('ads-client-connection', {
+  RED.nodes.registerType('ads-over-mqtt-client-connection', {
       category: 'config',
       defaults: {
           brokerUrl: {value:'mqtt://localhost:1883', required:true},
@@ -18,7 +18,7 @@
   });
 </script>
 
-<script type="text/x-red" data-template-name="ads-client-connection">
+<script type="text/x-red" data-template-name="ads-over-mqtt-client-connection">
   <div class="form-row">
     <label for="node-config-input-brokerUrl"><i class="fa fa-globe"></i> Broker URL</label>
     <input type="text" id="node-config-input-brokerUrl">
@@ -49,6 +49,6 @@
   </div>
 </script>
 
-<script type="text/x-red" data-help-name="ads-client-connection">
+<script type="text/x-red" data-help-name="ads-over-mqtt-client-connection">
   <p>Configuration for ADS over MQTT connection.</p>
 </script>

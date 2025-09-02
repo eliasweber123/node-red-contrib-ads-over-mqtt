@@ -1,5 +1,5 @@
 module.exports = function(RED) {
-  function AdsClientReadSymbol(config) {
+  function AdsOverMqttClientReadSymbols(config) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
@@ -39,5 +39,5 @@ module.exports = function(RED) {
       done();
     });
   }
-  RED.nodes.registerType('ads-client-read-symbol', AdsClientReadSymbol);
+  RED.nodes.registerType('ads-over-mqtt-client-read-symbols', AdsOverMqttClientReadSymbols);
 };

@@ -1,8 +1,8 @@
-// nodes/ads-client-connection.js
+// nodes/ads-over-mqtt-client-connection.js
 module.exports = function (RED) {
   const mqtt = require("mqtt");
 
-  function AdsClientConnection(config) {
+  function AdsOverMqttClientConnection(config) {
     RED.nodes.createNode(this, config);
     const node = this;
 
@@ -19,7 +19,7 @@ module.exports = function (RED) {
 
     if (!node.brokerUrl) {
       node.status({ fill: "red", shape: "ring", text: "missing brokerUrl" });
-      node.error("ads-client-connection: brokerUrl fehlt");
+      node.error("ads-over-mqtt-client-connection: brokerUrl fehlt");
       return;
     }
 
@@ -87,7 +87,7 @@ module.exports = function (RED) {
     };
   }
 
-  RED.nodes.registerType("ads-client-connection", AdsClientConnection, {
+  RED.nodes.registerType("ads-over-mqtt-client-connection", AdsOverMqttClientConnection, {
     credentials: {
       username: { type: "text" },
       password: { type: "password" },

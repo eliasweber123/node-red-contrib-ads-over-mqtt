@@ -7,11 +7,11 @@ ADS symbols using MQTT messages.
 
 ## Nodes
 
-- **ads-client-connection** – configuration node that establishes the MQTT
+- **ads-over-mqtt-client-connection** – configuration node that establishes the MQTT
   connection and holds AMS routing parameters.
-- **ads-client-read-symbol** – reads the value of a given ADS symbol. The symbol
+- **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol. The symbol
   can be configured in the node or supplied as `msg.symbol`.
-- **ads-client-write-symbol** – writes a value from `msg.payload` to the
+- **ads-over-mqtt-write-symbols** – writes a value from `msg.payload` to the
   specified ADS symbol.
 
 These nodes publish and subscribe to the following MQTT topics:
