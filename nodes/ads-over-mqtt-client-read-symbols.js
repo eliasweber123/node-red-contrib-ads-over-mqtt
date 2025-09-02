@@ -10,16 +10,13 @@ module.exports = function (RED) {
       return;
     }
 
-    const networkName = "VirtualAmsNetwork1";
-    const reqTopic = `${networkName}/${node.connection.targetAmsNetId}/ams`;
-    const resTopic = `${networkName}/${node.connection.targetAmsNetId}/ams/res`;
-    const oldResTopic = `${node.connection.clientId}/${node.connection.targetAmsNetId}/ams/res`;
+    // Use the connection's clientId as MQTT namespace
+    const namespace = node.connection.clientId;
+    const reqTopic = `${namespace}/${node.connection.targetAmsNetId}/ams`;
+    const resTopic = `${namespace}/${node.connection.amsNetId}/ams/res`;
 
     if (!node.connection._subscribedRes) {
       node.connection.client.subscribe(resTopic);
-      if (oldResTopic !== resTopic) {
-        node.connection.client.subscribe(oldResTopic);
-      }
       node.connection._subscribedRes = true;
     }
 
@@ -31,10 +28,7 @@ module.exports = function (RED) {
     }
 
     node.connection.client.on("message", (topic, message) => {
-      if (topic !== resTopic && topic !== oldResTopic) return;
-      if (topic === oldResTopic) {
-        node.warn(`Received message on deprecated topic ${topic}`);
-      }
+      if (topic !== resTopic) return;
       if (!Buffer.isBuffer(message) || message.length < 46) {
         node.error("Invalid AMS response frame");
         return;
@@ -61,18 +55,19 @@ module.exports = function (RED) {
       }
 
       const symbolBuf = Buffer.from(symbol + "\0", "ascii");
+      // ADS ReadWrite request: read value of symbol by name
       const adsRw = Buffer.alloc(16 + symbolBuf.length);
-      adsRw.writeUInt32LE(0xF003, 0); // IndexGroup
+      adsRw.writeUInt32LE(0xF004, 0); // IndexGroup: ADSIGRP_SYM_VALBYNAME
       adsRw.writeUInt32LE(0, 4); // IndexOffset
-      adsRw.writeUInt32LE(readLength, 8); // readLength
-      adsRw.writeUInt32LE(symbolBuf.length, 12); // writeLength
-      symbolBuf.copy(adsRw, 16);
+      adsRw.writeUInt32LE(readLength, 8); // number of bytes to read
+      adsRw.writeUInt32LE(symbolBuf.length, 12); // length of symbol name
+      symbolBuf.copy(adsRw, 16); // null-terminated symbol name
 
       const amsHeader = Buffer.alloc(32);
       amsNetIdToBuffer(node.connection.targetAmsNetId).copy(amsHeader, 0);
       amsHeader.writeUInt16LE(node.connection.port, 6);
       amsNetIdToBuffer(node.connection.amsNetId).copy(amsHeader, 8);
-      amsHeader.writeUInt16LE(node.connection.port, 14);
+      amsHeader.writeUInt16LE(node.connection.sourcePort, 14);
       amsHeader.writeUInt16LE(0x0009, 16); // CmdID ReadWrite
       amsHeader.writeUInt16LE(0x0004, 18); // StateFlags: ADS command
       amsHeader.writeUInt32LE(adsRw.length, 20);

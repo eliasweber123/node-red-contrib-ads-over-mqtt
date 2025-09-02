@@ -8,16 +8,15 @@ ADS symbols using MQTT messages.
 ## Nodes
 
 - **ads-over-mqtt-client-connection** – configuration node that establishes the MQTT
-  connection and holds AMS routing parameters.
+  connection and holds AMS routing parameters (including source port and namespace).
 - **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol. The symbol
   can be configured in the node or supplied as `msg.symbol`.
 - **ads-over-mqtt-write-symbols** – writes a value from `msg.payload` to the
   specified ADS symbol.
 
-These nodes publish requests to `VirtualAmsNetwork1/<targetAmsNetId>/ams` and
-listen for responses on `VirtualAmsNetwork1/<targetAmsNetId>/ams/res`. Messages
-on the old `<clientId>/<targetAmsNetId>/ams` topics are still accepted but will
-produce a warning.
+These nodes publish requests to `<namespace>/<targetAmsNetId>/ams` and listen
+for responses on `<namespace>/<sourceAmsNetId>/ams/res`. The `<namespace>` is
+the MQTT client ID configured in the connection node.
 
 Payloads are raw ADS/AMS frames. Within Node-RED flows they are represented as
 Buffers. When serialising to JSON (for example for MQTT nodes), the Buffer can
