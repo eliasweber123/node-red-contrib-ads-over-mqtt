@@ -8,7 +8,7 @@
       symbol: {value:"", required:true}
     },
     inputs: 1,
-    outputs: 1,
+    outputs: 2,
     icon: "bridge.png",
     label: function() {
       return this.name || this.symbol || 'ads read';
@@ -34,5 +34,9 @@
 <script type="text/x-red" data-help-name="ads-over-mqtt-client-read-symbols">
   <p>Reads a symbol value from an ADS device over MQTT.</p>
   <p><b>Inputs</b>: <code>msg.symbol</code> can override the configured symbol.</p>
-  <p><b>Outputs</b>: <code>msg.payload</code> contains the value of the symbol.</p>
+  <p><b>Outputs</b>:</p>
+  <ol>
+    <li><code>msg.payload</code> contains the value of the symbol.</li>
+    <li><code>msg.payload</code> contains the request frame as hex string.</li>
+  </ol>
 </script>
