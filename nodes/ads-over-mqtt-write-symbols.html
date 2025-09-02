@@ -1,10 +1,10 @@
 <script type="text/javascript">
-  RED.nodes.registerType('ads-client-write-symbol', {
+  RED.nodes.registerType('ads-over-mqtt-write-symbols', {
     category: 'function',
     color: '#c6dbef',
     defaults: {
       name: {value:""},
-      connection: {type:"ads-client-connection", required:true},
+      connection: {type:"ads-over-mqtt-client-connection", required:true},
       symbol: {value:"", required:true}
     },
     inputs: 1,
@@ -16,7 +16,7 @@
   });
 </script>
 
-<script type="text/x-red" data-template-name="ads-client-write-symbol">
+<script type="text/x-red" data-template-name="ads-over-mqtt-write-symbols">
   <div class="form-row">
     <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
     <input type="text" id="node-input-name">
@@ -31,7 +31,7 @@
   </div>
 </script>
 
-<script type="text/x-red" data-help-name="ads-client-write-symbol">
+<script type="text/x-red" data-help-name="ads-over-mqtt-write-symbols">
   <p>Writes a value to an ADS symbol over MQTT. The value is taken from <code>msg.payload</code>.</p>
   <p><b>Inputs</b>: <code>msg.symbol</code> can override the configured symbol.</p>
   <p><b>Outputs</b>: forwards the input message once published.</p>

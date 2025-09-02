@@ -1,5 +1,5 @@
 module.exports = function(RED) {
-  function AdsClientWriteSymbol(config) {
+  function AdsOverMqttWriteSymbols(config) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
@@ -29,5 +29,5 @@ module.exports = function(RED) {
       done();
     });
   }
-  RED.nodes.registerType('ads-client-write-symbol', AdsClientWriteSymbol);
+  RED.nodes.registerType('ads-over-mqtt-write-symbols', AdsOverMqttWriteSymbols);
 };
