@@ -10,7 +10,9 @@ module.exports = function (RED) {
     node.brokerUrl = (config.brokerUrl || "").trim();
     node.amsNetId = (config.amsNetId || "").trim();
     node.targetAmsNetId = (config.targetAmsNetId || "").trim();
-    node.port = Number(config.port) || 851;
+    node.port = Number(config.port) || 851; // target port (remote ADS)
+    // Optional source port for this client (constant per session)
+    node.sourcePort = Number(config.sourcePort) || 32905;
 
     const { username, password } = node.credentials || {};
     const rawClientId = (config.clientId || "").trim();
@@ -87,6 +89,7 @@ module.exports = function (RED) {
         amsNetId: node.amsNetId,
         targetAmsNetId: node.targetAmsNetId,
         port: node.port,
+        sourcePort: node.sourcePort,
         clientId: node.clientId,
         client: node.client,
       };
