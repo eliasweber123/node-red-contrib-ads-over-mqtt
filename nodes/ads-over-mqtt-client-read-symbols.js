@@ -10,7 +10,7 @@ module.exports = function(RED) {
       return;
     }
 
-    const reqTopic = `${node.connection.clientId}/${node.connection.targetAmsNetId}/ads/req`;
+    const reqTopic = `${node.connection.clientId}/${node.connection.targetAmsNetId}/ams`;
     const resTopic = `${node.connection.clientId}/${node.connection.targetAmsNetId}/ams/res`;
 
     if (!node.connection._subscribedRes) {
