@@ -3,6 +3,8 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
+    node.dateityp = config.dateityp;
+    node.stringLength = Number(config.stringLength) || 80;
     node.connection = RED.nodes.getNode(config.connection);
 
     if (!node.connection || !node.connection.client) {
@@ -41,10 +43,15 @@ module.exports = function (RED) {
       const len = message.readUInt32LE(42);
       const data = message.slice(46, 46 + len);
 
+      let value = data;
+      if (pending.dateityp) {
+        value = decodeData(data, pending.dateityp);
+      }
+
       delete node.pendingRequests[invokeId];
       // send response on first output only
       pending.send([
-        { payload: data, symbol: pending.symbol, invokeId, result },
+        { payload: value, symbol: pending.symbol, invokeId, result },
         null,
       ]);
       pending.done();
@@ -52,7 +59,33 @@ module.exports = function (RED) {
 
     node.on("input", (msg, send, done) => {
       const symbol = msg.symbol || node.symbol;
-      const readLength = Number(msg.readLength) || 0;
+      const dateityp = msg.dateityp || node.dateityp;
+
+      let readLength = Number(msg.readLength) || 0;
+      if (dateityp) {
+        const type = String(dateityp).toUpperCase();
+        const lenMap = {
+          BOOL: 1,
+          BYTE: 1,
+          SINT: 1,
+          USINT: 1,
+          INT: 2,
+          UINT: 2,
+          WORD: 2,
+          DINT: 4,
+          UDINT: 4,
+          DWORD: 4,
+          REAL: 4,
+          LINT: 8,
+          ULINT: 8,
+          LREAL: 8,
+        };
+        if (type === "STRING") {
+          readLength = node.stringLength;
+        } else if (lenMap[type]) {
+          readLength = lenMap[type];
+        }
+      }
       if (!symbol) {
         done(new Error("No symbol specified"));
         return;
@@ -97,7 +130,7 @@ module.exports = function (RED) {
         },
       ]);
 
-      node.pendingRequests[invokeId] = { symbol, send, done };
+      node.pendingRequests[invokeId] = { symbol, dateityp, send, done };
       node.connection.client.publish(reqTopic, frame);
     });
   }
@@ -107,3 +140,37 @@ module.exports = function (RED) {
     AdsOverMqttClientReadSymbols
   );
 };
+
+function decodeData(buf, type) {
+  switch (type) {
+    case "BOOL":
+      return buf[0] !== 0;
+    case "BYTE":
+    case "USINT":
+      return buf.readUInt8(0);
+    case "SINT":
+      return buf.readInt8(0);
+    case "INT":
+      return buf.readInt16LE(0);
+    case "UINT":
+    case "WORD":
+      return buf.readUInt16LE(0);
+    case "DINT":
+      return buf.readInt32LE(0);
+    case "UDINT":
+    case "DWORD":
+      return buf.readUInt32LE(0);
+    case "REAL":
+      return buf.readFloatLE(0);
+    case "LINT":
+      return buf.readBigInt64LE(0);
+    case "ULINT":
+      return buf.readBigUInt64LE(0);
+    case "LREAL":
+      return buf.readDoubleLE(0);
+    case "STRING":
+      return buf.toString("ascii").replace(/\0.*$/, "");
+    default:
+      return buf;
+  }
+}

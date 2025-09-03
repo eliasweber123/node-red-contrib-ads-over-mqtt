@@ -10,7 +10,9 @@ ADS symbols using MQTT messages.
 - **ads-over-mqtt-client-connection** – configuration node that establishes the MQTT
   connection and holds AMS routing parameters (including source port and namespace).
 - **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol. The symbol
-  can be configured in the node or supplied as `msg.symbol`.
+  can be configured in the node or supplied as `msg.symbol`. The data type determines the
+  number of bytes to read and the decoding and can be set in the node or via `msg.dateityp`.
+  For STRING values the length is taken from the `STRING Länge` field (default 80).
 - **ads-over-mqtt-write-symbols** – writes a value from `msg.payload` to the
   specified ADS symbol.
 
@@ -29,9 +31,9 @@ be expressed as an object
 ### Example
 
 ```js
-// Read 4 bytes from symbol 'MAIN.myVar'
+// Read a DINT (4 bytes) from symbol 'MAIN.myVar'
 msg.symbol = 'MAIN.myVar';
-msg.readLength = 4;
+msg.dateityp = 'DINT';
 return msg;
 ```
 
@@ -63,9 +65,10 @@ An example response for the above request:
 }
 ```
 
-The read node outputs the response data in `msg.payload` as a Buffer. The write
-node forwards an empty Buffer on success. Both nodes include the `invokeId` and
-ADS result code in the message.
+The read node outputs the response data in `msg.payload` as the decoded value
+according to the configured data type (or as a `Buffer` if no known type is
+specified). The write node forwards an empty Buffer on success. Both nodes
+include the `invokeId` and ADS result code in the message.
 
 ## Development
 
