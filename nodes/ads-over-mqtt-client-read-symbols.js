@@ -3,6 +3,8 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
+    node.dateityp = config.dateityp;
+    node.stringLength = Number(config.stringLength) || 80;
     node.connection = RED.nodes.getNode(config.connection);
 
     if (!node.connection || !node.connection.client) {
@@ -52,7 +54,42 @@ module.exports = function (RED) {
 
     node.on("input", (msg, send, done) => {
       const symbol = msg.symbol || node.symbol;
-      const readLength = Number(msg.readLength) || 0;
+      const dateityp = msg.dateityp || node.dateityp;
+      let readLength = 0;
+      if (dateityp) {
+        switch (dateityp) {
+          case "BOOL":
+          case "BYTE":
+          case "SINT":
+          case "USINT":
+            readLength = 1;
+            break;
+          case "INT":
+          case "UINT":
+          case "WORD":
+            readLength = 2;
+            break;
+          case "DINT":
+          case "UDINT":
+          case "DWORD":
+          case "REAL":
+            readLength = 4;
+            break;
+          case "LINT":
+          case "ULINT":
+          case "LREAL":
+            readLength = 8;
+            break;
+          case "STRING":
+            readLength = Number(msg.stringLength || node.stringLength || 80);
+            msg.encoding = "ascii";
+            break;
+          default:
+            readLength = 0;
+        }
+      } else {
+        readLength = Number(msg.readLength) || 0;
+      }
       if (!symbol) {
         done(new Error("No symbol specified"));
         return;
