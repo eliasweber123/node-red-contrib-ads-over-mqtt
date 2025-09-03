@@ -4,8 +4,7 @@
     color: '#a6bbcf',
     defaults: {
       name: {value:""},
-      connection: {type:"ads-over-mqtt-client-connection", required:true},
-      targetAmsNetId: {value:"", required:true}
+      connection: {type:"ads-over-mqtt-client-connection", required:true}
     },
     inputs: 0,
     outputs: 1,
@@ -25,10 +24,6 @@
   <div class="form-row">
     <label for="node-input-connection"><i class="fa fa-plug"></i> Connection</label>
     <input type="text" id="node-input-connection">
-  </div>
-  <div class="form-row">
-    <label for="node-input-targetAmsNetId"><i class="fa fa-crosshairs"></i> Target AMS Net ID</label>
-    <input type="text" id="node-input-targetAmsNetId">
   </div>
 </script>
 

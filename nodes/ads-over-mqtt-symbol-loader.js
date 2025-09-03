@@ -3,7 +3,6 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.connection = RED.nodes.getNode(config.connection);
-    node.targetAmsNetId = config.targetAmsNetId;
 
     if (!node.connection || !node.connection.client) {
       node.error("No ADS connection configured");
@@ -55,7 +54,7 @@ module.exports = function (RED) {
       adsRead.writeUInt32LE(length, 8);
 
       const amsHeader = Buffer.alloc(32);
-      amsNetIdToBuffer(node.targetAmsNetId).copy(amsHeader, 0);
+      amsNetIdToBuffer(node.connection.targetAmsNetId).copy(amsHeader, 0);
       amsHeader.writeUInt16LE(node.connection.port, 6);
       amsNetIdToBuffer(node.connection.amsNetId).copy(amsHeader, 8);
       amsHeader.writeUInt16LE(node.connection.sourcePort, 14);
@@ -73,7 +72,7 @@ module.exports = function (RED) {
       const frame = Buffer.concat([tcpHeader, amsHeader, adsRead]);
 
       node.pendingRequests[invokeId] = { callback: cb };
-      const reqTopic = `${namespace}/${node.targetAmsNetId}/ams`;
+      const reqTopic = `${namespace}/${node.connection.targetAmsNetId}/ams`;
       node.connection.client.publish(reqTopic, frame);
     }
 
@@ -123,7 +122,7 @@ module.exports = function (RED) {
           const globalContext = node.context().global;
           const all = globalContext.get("symbols") || {};
           if (!all[node.connection.id]) all[node.connection.id] = {};
-          all[node.connection.id][node.targetAmsNetId] = symbols;
+          all[node.connection.id][node.connection.targetAmsNetId] = symbols;
           globalContext.set("symbols", all);
           node.symbolsAvailable = true;
         });
