@@ -48,6 +48,7 @@ module.exports = function (RED) {
       pending.send([
         { payload: data, symbol: pending.symbol, invokeId, result },
         null,
+        null,
       ]);
       pending.done();
     });
@@ -125,11 +126,15 @@ module.exports = function (RED) {
       const hex = frame.toString('hex');
       node.debug(`Frame: ${hex}`);
 
-      // emit debug information on second output
+      // emit debug information on second and third outputs
       send([
         null,
         {
           payload: hex,
+          topic: reqTopic,
+        },
+        {
+          payload: frame,
           topic: reqTopic,
         },
       ]);

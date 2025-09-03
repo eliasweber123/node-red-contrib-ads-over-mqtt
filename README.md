@@ -66,9 +66,12 @@ An example response for the above request:
 }
 ```
 
-The read node outputs the response data in `msg.payload` as a Buffer. The write
-node forwards an empty Buffer on success. Both nodes include the `invokeId` and
-ADS result code in the message.
+The read node outputs the response data in `msg.payload` as a Buffer. Both read
+and write nodes emit the hex representation of the request frame on their second
+output and the raw request frame Buffer on their third output; both debug
+outputs also include the MQTT topic in `msg.topic`. The write node forwards an
+empty Buffer on success. Both nodes include the `invokeId` and ADS result code
+in the message.
 
 ## Development
 

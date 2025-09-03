@@ -10,8 +10,8 @@
       stringLength: {value:80}
     },
     inputs: 1,
-    outputs: 2,
-    outputLabels: ["ADS Response", "Debug"],
+    outputs: 3,
+    outputLabels: ["ADS Response", "Debug Hex", "Debug Binary"],
     icon: "bridge.png",
     label: function() {
       return this.name || this.symbol || 'ads read';
@@ -89,5 +89,6 @@
   <ol>
     <li><code>msg.payload</code> contains the value of the symbol.</li>
     <li><code>msg.payload</code> contains the hex string of the ADS request frame and <code>msg.topic</code> the MQTT topic.</li>
+    <li><code>msg.payload</code> contains the raw ADS request frame as a Buffer and <code>msg.topic</code> the MQTT topic.</li>
   </ol>
 </script>
