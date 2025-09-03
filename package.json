@@ -8,7 +8,8 @@
     "nodes": {
       "ads-over-mqtt-client-connection": "nodes/ads-over-mqtt-client-connection.js",
       "ads-over-mqtt-client-read-symbols": "nodes/ads-over-mqtt-client-read-symbols.js",
-      "ads-over-mqtt-write-symbols": "nodes/ads-over-mqtt-write-symbols.js"
+      "ads-over-mqtt-write-symbols": "nodes/ads-over-mqtt-write-symbols.js",
+      "ads-over-mqtt-symbol-loader": "nodes/ads-over-mqtt-symbol-loader.js"
     }
   },
   "dependencies": {

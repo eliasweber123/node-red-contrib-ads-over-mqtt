@@ -15,14 +15,15 @@ module.exports = function (RED) {
     node.sourcePort = Number(config.sourcePort) || 32905;
 
     const { username, password } = node.credentials || {};
-    const rawClientId = (config.clientId || "").trim();
-    if (!rawClientId) {
-      node.warn(
-        "ads-over-mqtt-client-connection: clientId (network name) is empty"
-      );
+    const rawTopic = (config.topic || "").trim();
+    if (!rawTopic) {
+      node.warn("ads-over-mqtt-client-connection: topic is empty");
     }
-    node.clientId =
-      rawClientId || "node-red-ads-" + Math.random().toString(16).slice(2, 10);
+    node.topic = rawTopic || "ads";
+
+    // generate internal MQTT client id automatically
+    node.mqttClientId =
+      "node-red-ads-" + Math.random().toString(16).slice(2, 10);
 
     if (!node.brokerUrl) {
       node.status({ fill: "red", shape: "ring", text: "missing brokerUrl" });
@@ -31,7 +32,7 @@ module.exports = function (RED) {
     }
 
     const options = {
-      clientId: node.clientId,
+      clientId: node.mqttClientId,
       username,
       password,
       keepalive: 60,
@@ -90,7 +91,8 @@ module.exports = function (RED) {
         targetAmsNetId: node.targetAmsNetId,
         port: node.port,
         sourcePort: node.sourcePort,
-        clientId: node.clientId,
+        topic: node.topic,
+        clientId: node.mqttClientId,
         client: node.client,
       };
     };

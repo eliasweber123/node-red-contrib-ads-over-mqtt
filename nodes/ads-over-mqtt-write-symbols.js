@@ -3,6 +3,7 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
+    node.targetAmsNetId = config.targetAmsNetId;
     node.connection = RED.nodes.getNode(config.connection);
 
     if (!node.connection || !node.connection.client) {
@@ -10,9 +11,7 @@ module.exports = function (RED) {
       return;
     }
 
-    // Use connection's clientId as MQTT namespace
-    const namespace = node.connection.clientId;
-    const reqTopic = `${namespace}/${node.connection.targetAmsNetId}/ams`;
+    const namespace = node.connection.topic;
     const resTopic = `${namespace}/${node.connection.amsNetId}/ams/res`;
 
     if (!node.connection._subscribedRes) {
@@ -27,19 +26,39 @@ module.exports = function (RED) {
       return Buffer.from(id.split('.').map((n) => parseInt(n, 10)));
     }
 
-    function decodePayload(payload) {
-      if (Buffer.isBuffer(payload)) return payload;
-      if (
-        payload &&
-        payload.type === "ams" &&
-        payload.encoding === "base64" &&
-        typeof payload.data === "string"
-      ) {
-        try {
-          return Buffer.from(payload.data, "base64");
-        } catch (_) {
-          return null;
+    function encodeValue(datatype, size, payload) {
+      if (Buffer.isBuffer(payload)) {
+        if (payload.length !== size) return null;
+        return payload;
+      }
+      const buf = Buffer.alloc(size);
+      if (typeof payload === "number") {
+        switch (size) {
+          case 1:
+            buf.writeUInt8(payload);
+            return buf;
+          case 2:
+            buf.writeUInt16LE(payload);
+            return buf;
+          case 4:
+            buf.writeUInt32LE(payload);
+            return buf;
+          case 8:
+            buf.writeDoubleLE(payload);
+            return buf;
+          default:
+            return null;
         }
+      }
+      if (typeof payload === "boolean" && size === 1) {
+        buf.writeUInt8(payload ? 1 : 0);
+        return buf;
+      }
+      if (typeof payload === "string") {
+        const strBuf = Buffer.from(payload, "ascii");
+        if (strBuf.length > size) return null;
+        strBuf.copy(buf);
+        return buf;
       }
       return null;
     }
@@ -69,61 +88,64 @@ module.exports = function (RED) {
 
     node.on("input", (msg, send, done) => {
       const symbol = msg.symbol || node.symbol;
+      const targetAms =
+        msg.targetAmsNetId || node.targetAmsNetId || node.connection.targetAmsNetId;
       if (!symbol) {
         done(new Error("No symbol specified"));
         return;
       }
-
-      const valueBuf = decodePayload(msg.payload);
-      if (!valueBuf) {
-        const err = new Error("Unsupported payload format");
-        node.error(err, msg);
-        done(err);
+      if (!targetAms) {
+        done(new Error("No target AMS Net ID specified"));
         return;
       }
 
-      const symbolBuf = Buffer.from(symbol + "\0", "ascii");
-      const writeBuf = Buffer.concat([symbolBuf, valueBuf]);
-      // ADS ReadWrite request: write value of symbol by name
-      const adsRw = Buffer.alloc(16 + writeBuf.length);
-      adsRw.writeUInt32LE(0xF004, 0); // IndexGroup: ADSIGRP_SYM_VALBYNAME
-      adsRw.writeUInt32LE(0, 4); // IndexOffset
-      adsRw.writeUInt32LE(0, 8); // readLength
-      adsRw.writeUInt32LE(writeBuf.length, 12); // bytes to write (name + value)
-      writeBuf.copy(adsRw, 16); // symbol name + value
+      const globalContext = node.context().global;
+      const symbols = globalContext.get("symbols") || {};
+      const connSymbols = symbols[node.connection.id] || {};
+      const targetSymbols = connSymbols[targetAms] || {};
+      const symInfo = targetSymbols[symbol];
+      if (!symInfo) {
+        done(new Error("Symbol not found in cache"));
+        return;
+      }
+
+      const valueBuf = encodeValue(symInfo.datatype, symInfo.size, msg.payload);
+      if (!valueBuf) {
+        done(new Error("Unsupported payload format"));
+        return;
+      }
+
+      const reqTopic = `${namespace}/${targetAms}/ams`;
+
+      const adsWrite = Buffer.alloc(12 + valueBuf.length);
+      adsWrite.writeUInt32LE(symInfo.ig, 0);
+      adsWrite.writeUInt32LE(symInfo.io, 4);
+      adsWrite.writeUInt32LE(symInfo.size, 8);
+      valueBuf.copy(adsWrite, 12);
 
       const amsHeader = Buffer.alloc(32);
-      amsNetIdToBuffer(node.connection.targetAmsNetId).copy(amsHeader, 0);
+      amsNetIdToBuffer(targetAms).copy(amsHeader, 0);
       amsHeader.writeUInt16LE(node.connection.port, 6);
       amsNetIdToBuffer(node.connection.amsNetId).copy(amsHeader, 8);
       amsHeader.writeUInt16LE(node.connection.sourcePort, 14);
-      amsHeader.writeUInt16LE(0x0009, 16); // CmdID ReadWrite
-      amsHeader.writeUInt16LE(0x0004, 18); // StateFlags: ADS command
-      amsHeader.writeUInt32LE(adsRw.length, 20);
-      amsHeader.writeUInt32LE(0, 24); // ErrorCode
+      amsHeader.writeUInt16LE(0x0003, 16); // CmdID Write
+      amsHeader.writeUInt16LE(0x0004, 18);
+      amsHeader.writeUInt32LE(adsWrite.length, 20);
+      amsHeader.writeUInt32LE(0, 24);
       const invokeId = node._invokeId++ & 0xffffffff;
       amsHeader.writeUInt32LE(invokeId, 28);
 
       const tcpHeader = Buffer.alloc(6);
       tcpHeader.writeUInt16LE(0, 0);
-      tcpHeader.writeUInt32LE(amsHeader.length + adsRw.length, 2);
+      tcpHeader.writeUInt32LE(amsHeader.length + adsWrite.length, 2);
 
-      const frame = Buffer.concat([tcpHeader, amsHeader, adsRw]);
+      const frame = Buffer.concat([tcpHeader, amsHeader, adsWrite]);
+      const hex = frame.toString("hex");
 
-      const hex = frame.toString('hex');
-      node.debug(`Frame: ${hex}`);
-
-      // emit debug information on second and third outputs
       send([
         null,
-        {
-          payload: hex,
-          topic: reqTopic,
-        },
-        {
-          payload: frame,
-          topic: reqTopic,
-        },
+        { payload: hex, topic: reqTopic },
+        { payload: frame, topic: reqTopic },
       ]);
 
       node.pendingRequests[invokeId] = { symbol, send, done };
@@ -131,5 +153,8 @@ module.exports = function (RED) {
     });
   }
 
-  RED.nodes.registerType("ads-over-mqtt-write-symbols", AdsOverMqttWriteSymbols);
+  RED.nodes.registerType(
+    "ads-over-mqtt-write-symbols",
+    AdsOverMqttWriteSymbols
+  );
 };

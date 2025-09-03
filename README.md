@@ -8,16 +8,19 @@ ADS symbols using MQTT messages.
 ## Nodes
 
 - **ads-over-mqtt-client-connection** – configuration node that establishes the MQTT
-  connection and holds AMS routing parameters (including source port and namespace).
-- **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol. The symbol
-  can be configured in the node or supplied as `msg.symbol`.
-  The data type can be selected in the node or provided as `msg.dateityp`.
+  connection and holds AMS routing parameters. It also defines the internal
+  MQTT topic prefix used for ADS messages.
+- **ads-over-mqtt-symbol-loader** – loads the complete symbol table from a
+  target and caches it in `global.symbols`.
+- **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol
+  using the cached symbol information. The symbol can be configured in the node
+  or supplied as `msg.symbol`.
 - **ads-over-mqtt-write-symbols** – writes a value from `msg.payload` to the
-  specified ADS symbol.
+  specified ADS symbol using the cached symbol information.
 
-These nodes publish requests to `<namespace>/<targetAmsNetId>/ams` and listen
-for responses on `<namespace>/<sourceAmsNetId>/ams/res`. The `<namespace>` is
-the MQTT client ID configured in the connection node.
+These nodes publish requests to `<topic>/<targetAmsNetId>/ams` and listen
+for responses on `<topic>/<sourceAmsNetId>/ams/res`. The `<topic>` is
+configured in the connection node.
 
 Payloads are raw ADS/AMS frames. Within Node-RED flows they are represented as
 Buffers. When serialising to JSON (for example for MQTT nodes), the Buffer can
@@ -30,13 +33,10 @@ be expressed as an object
 ### Example
 
 ```js
-// Read 4 bytes from symbol 'MAIN.myVar'
+// Read value of symbol 'MAIN.myVar'
 msg.symbol = 'MAIN.myVar';
-msg.dateityp = 'DINT';
 return msg;
 ```
-
-For strings, `msg.stringLength` can override the configured length (default 80).
 
 If you need to inject a frame manually:
 
