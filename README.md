@@ -13,7 +13,9 @@ ADS symbols using MQTT messages.
   use the value from the connection node. It also defines the internal
   MQTT topic prefix used for ADS messages.
 - **ads-over-mqtt-symbol-loader** – loads the complete symbol table from a
-  target and caches it in `global.symbols`.
+  target and caches it in `global.symbols`. It triggers on input and reports the
+  status every 5 seconds on its first output. The second and third outputs
+  provide hex and raw debug frames of the ADS requests.
 - **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol
   using the cached symbol information. The symbol can be configured in the node
   or supplied as `msg.symbol`.

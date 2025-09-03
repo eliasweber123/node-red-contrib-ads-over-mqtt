@@ -73,6 +73,11 @@ module.exports = function (RED) {
 
       node.pendingRequests[invokeId] = { callback: cb };
       const reqTopic = `${namespace}/${node.connection.targetAmsNetId}/ams`;
+      node.send([
+        null,
+        { payload: frame.toString("hex"), topic: reqTopic },
+        { payload: frame, topic: reqTopic },
+      ]);
       node.connection.client.publish(reqTopic, frame);
     }
 
@@ -105,14 +110,9 @@ module.exports = function (RED) {
     }
 
     function loadSymbols() {
-      // Step 1: get upload info
-      sendAdsRead(0xf00c, 0, 24, (err, info) => {
-        if (err || !info || info.length < 24) {
-          node.warn("Failed to read symbol upload info");
-          return;
-        }
-        const symSize = info.readUInt32LE(0);
-        // Step 2: read symbol table
+      node.symbolsAvailable = false;
+
+      function readSymbols(symSize, datatypeSize) {
         sendAdsRead(0xf00b, 0, symSize, (err2, table) => {
           if (err2 || !table) {
             node.warn("Failed to read symbol table");
@@ -124,19 +124,45 @@ module.exports = function (RED) {
           if (!all[node.connection.id]) all[node.connection.id] = {};
           all[node.connection.id][node.connection.targetAmsNetId] = symbols;
           globalContext.set("symbols", all);
+          if (datatypeSize > 0) {
+            sendAdsRead(0xf00e, 0, datatypeSize, () => {});
+          }
           node.symbolsAvailable = true;
         });
+      }
+
+      sendAdsRead(0xf00f, 0, 24, (err, info) => {
+        if (!err && info && info.length >= 24) {
+          const symSize = info.readUInt32LE(4);
+          const datatypeSize = info.readUInt32LE(16);
+          readSymbols(symSize, datatypeSize);
+        } else {
+          sendAdsRead(0xf00c, 0, 24, (err2, info2) => {
+            if (err2 || !info2 || info2.length < 24) {
+              node.warn("Failed to read symbol upload info");
+              return;
+            }
+            const symSize = info2.readUInt32LE(0);
+            readSymbols(symSize, 0);
+          });
+        }
       });
     }
 
-    loadSymbols();
+    node.on("input", () => {
+      loadSymbols();
+    });
 
     node.interval = setInterval(() => {
-      node.send({
-        payload: node.symbolsAvailable
-          ? "Symbols available"
-          : "Symbols not available",
-      });
+      node.send([
+        {
+          payload: node.symbolsAvailable
+            ? "Symbols available"
+            : "Symbols not available",
+        },
+        null,
+        null,
+      ]);
     }, 5000);
 
     node.on("close", () => {
