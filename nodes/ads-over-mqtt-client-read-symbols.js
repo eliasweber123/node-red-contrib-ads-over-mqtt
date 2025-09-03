@@ -3,8 +3,7 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
-    node.dateityp = config.dateityp;
-    node.stringLength = Number(config.stringLength) || 80;
+    node.targetAmsNetId = config.targetAmsNetId;
     node.connection = RED.nodes.getNode(config.connection);
 
     if (!node.connection || !node.connection.client) {
@@ -12,9 +11,7 @@ module.exports = function (RED) {
       return;
     }
 
-    // Use the connection's clientId as MQTT namespace
-    const namespace = node.connection.clientId;
-    const reqTopic = `${namespace}/${node.connection.targetAmsNetId}/ams`;
+    const namespace = node.connection.topic;
     const resTopic = `${namespace}/${node.connection.amsNetId}/ams/res`;
 
     if (!node.connection._subscribedRes) {
@@ -44,7 +41,6 @@ module.exports = function (RED) {
       const data = message.slice(46, 46 + len);
 
       delete node.pendingRequests[invokeId];
-      // send response on first output only
       pending.send([
         { payload: data, symbol: pending.symbol, invokeId, result },
         null,
@@ -55,88 +51,57 @@ module.exports = function (RED) {
 
     node.on("input", (msg, send, done) => {
       const symbol = msg.symbol || node.symbol;
-      const dateityp = msg.dateityp || node.dateityp;
-      let readLength = 0;
-      if (dateityp) {
-        switch (dateityp) {
-          case "BOOL":
-          case "BYTE":
-          case "SINT":
-          case "USINT":
-            readLength = 1;
-            break;
-          case "INT":
-          case "UINT":
-          case "WORD":
-            readLength = 2;
-            break;
-          case "DINT":
-          case "UDINT":
-          case "DWORD":
-          case "REAL":
-            readLength = 4;
-            break;
-          case "LINT":
-          case "ULINT":
-          case "LREAL":
-            readLength = 8;
-            break;
-          case "STRING":
-            readLength = Number(msg.stringLength || node.stringLength || 80);
-            msg.encoding = "ascii";
-            break;
-          default:
-            readLength = 0;
-        }
-      } else {
-        readLength = Number(msg.readLength) || 0;
-      }
+      const targetAms =
+        msg.targetAmsNetId || node.targetAmsNetId || node.connection.targetAmsNetId;
       if (!symbol) {
         done(new Error("No symbol specified"));
         return;
       }
+      if (!targetAms) {
+        done(new Error("No target AMS Net ID specified"));
+        return;
+      }
 
-      const symbolBuf = Buffer.from(symbol + "\0", "ascii");
-      // ADS ReadWrite request: read value of symbol by name
-      const adsRw = Buffer.alloc(16 + symbolBuf.length);
-      adsRw.writeUInt32LE(0xF004, 0); // IndexGroup: ADSIGRP_SYM_VALBYNAME
-      adsRw.writeUInt32LE(0, 4); // IndexOffset
-      adsRw.writeUInt32LE(readLength, 8); // number of bytes to read
-      adsRw.writeUInt32LE(symbolBuf.length, 12); // length of symbol name
-      symbolBuf.copy(adsRw, 16); // null-terminated symbol name
+      const globalContext = node.context().global;
+      const symbols = globalContext.get("symbols") || {};
+      const connSymbols = symbols[node.connection.id] || {};
+      const targetSymbols = connSymbols[targetAms] || {};
+      const symInfo = targetSymbols[symbol];
+      if (!symInfo) {
+        done(new Error("Symbol not found in cache"));
+        return;
+      }
+
+      const reqTopic = `${namespace}/${targetAms}/ams`;
+
+      const adsRead = Buffer.alloc(12);
+      adsRead.writeUInt32LE(symInfo.ig, 0);
+      adsRead.writeUInt32LE(symInfo.io, 4);
+      adsRead.writeUInt32LE(symInfo.size, 8);
 
       const amsHeader = Buffer.alloc(32);
-      amsNetIdToBuffer(node.connection.targetAmsNetId).copy(amsHeader, 0);
+      amsNetIdToBuffer(targetAms).copy(amsHeader, 0);
       amsHeader.writeUInt16LE(node.connection.port, 6);
       amsNetIdToBuffer(node.connection.amsNetId).copy(amsHeader, 8);
       amsHeader.writeUInt16LE(node.connection.sourcePort, 14);
-      amsHeader.writeUInt16LE(0x0009, 16); // CmdID ReadWrite
-      amsHeader.writeUInt16LE(0x0004, 18); // StateFlags: ADS command
-      amsHeader.writeUInt32LE(adsRw.length, 20);
-      amsHeader.writeUInt32LE(0, 24); // ErrorCode
+      amsHeader.writeUInt16LE(0x0002, 16); // CmdID Read
+      amsHeader.writeUInt16LE(0x0004, 18); // StateFlags
+      amsHeader.writeUInt32LE(adsRead.length, 20);
+      amsHeader.writeUInt32LE(0, 24);
       const invokeId = node._invokeId++ & 0xffffffff;
       amsHeader.writeUInt32LE(invokeId, 28);
 
       const tcpHeader = Buffer.alloc(6);
       tcpHeader.writeUInt16LE(0, 0);
-      tcpHeader.writeUInt32LE(amsHeader.length + adsRw.length, 2);
+      tcpHeader.writeUInt32LE(amsHeader.length + adsRead.length, 2);
 
-      const frame = Buffer.concat([tcpHeader, amsHeader, adsRw]);
+      const frame = Buffer.concat([tcpHeader, amsHeader, adsRead]);
+      const hex = frame.toString("hex");
 
-      const hex = frame.toString('hex');
-      node.debug(`Frame: ${hex}`);
-
-      // emit debug information on second and third outputs
       send([
         null,
-        {
-          payload: hex,
-          topic: reqTopic,
-        },
-        {
-          payload: frame,
-          topic: reqTopic,
-        },
+        { payload: hex, topic: reqTopic },
+        { payload: frame, topic: reqTopic },
       ]);
 
       node.pendingRequests[invokeId] = { symbol, send, done };
