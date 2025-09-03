@@ -6,9 +6,9 @@
       name: {value:""},
       connection: {type:"ads-over-mqtt-client-connection", required:true}
     },
-    inputs: 0,
-    outputs: 1,
-    outputLabels: ["Status"],
+    inputs: 1,
+    outputs: 3,
+    outputLabels: ["Status", "Debug Hex", "Debug Raw"],
     icon: "bridge.png",
     label: function() {
       return this.name || 'ads symbol loader';
@@ -28,6 +28,7 @@
 </script>
 
 <script type="text/x-red" data-help-name="ads-over-mqtt-symbol-loader">
-  <p>Loads the complete ADS symbol table from the selected SPS via ADS over MQTT and caches it in <code>global.symbols</code>.</p>
-  <p>The node outputs the status every 5 seconds.</p>
+  <p>On trigger input, loads the complete ADS symbol table from the selected SPS via ADS over MQTT and caches it in <code>global.symbols</code>.</p>
+  <p>Output 1 reports status every 5 seconds.</p>
+  <p>Outputs 2 and 3 contain the hex string and raw Buffer of each published ADS request for debugging.</p>
 </script>
