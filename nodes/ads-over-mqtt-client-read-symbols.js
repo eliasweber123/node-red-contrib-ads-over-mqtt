@@ -3,7 +3,6 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
-    node.targetAmsNetId = config.targetAmsNetId;
     node.connection = RED.nodes.getNode(config.connection);
 
     if (!node.connection || !node.connection.client) {
@@ -51,8 +50,7 @@ module.exports = function (RED) {
 
     node.on("input", (msg, send, done) => {
       const symbol = msg.symbol || node.symbol;
-      const targetAms =
-        msg.targetAmsNetId || node.targetAmsNetId || node.connection.targetAmsNetId;
+      const targetAms = node.connection.targetAmsNetId;
       if (!symbol) {
         done(new Error("No symbol specified"));
         return;

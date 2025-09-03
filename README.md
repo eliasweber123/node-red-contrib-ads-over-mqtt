@@ -8,7 +8,9 @@ ADS symbols using MQTT messages.
 ## Nodes
 
 - **ads-over-mqtt-client-connection** – configuration node that establishes the MQTT
-  connection and holds AMS routing parameters. It also defines the internal
+  connection and holds AMS routing parameters, including the Target AMS Net ID.
+  This is the only place where the Target AMS Net ID is set. All other nodes
+  use the value from the connection node. It also defines the internal
   MQTT topic prefix used for ADS messages.
 - **ads-over-mqtt-symbol-loader** – loads the complete symbol table from a
   target and caches it in `global.symbols`.
@@ -19,8 +21,8 @@ ADS symbols using MQTT messages.
   specified ADS symbol using the cached symbol information.
 
 These nodes publish requests to `<topic>/<targetAmsNetId>/ams` and listen
-for responses on `<topic>/<sourceAmsNetId>/ams/res`. The `<topic>` is
-configured in the connection node.
+for responses on `<topic>/<sourceAmsNetId>/ams/res`. The `<targetAmsNetId>`
+and `<topic>` are configured in the connection node.
 
 Payloads are raw ADS/AMS frames. Within Node-RED flows they are represented as
 Buffers. When serialising to JSON (for example for MQTT nodes), the Buffer can

@@ -5,7 +5,6 @@
     defaults: {
       name: {value:""},
       connection: {type:"ads-over-mqtt-client-connection", required:true},
-      targetAmsNetId: {value:"", required:true},
       symbol: {value:"", required:true}
     },
     inputs: 1,
@@ -28,10 +27,6 @@
     <input type="text" id="node-input-connection">
   </div>
   <div class="form-row">
-    <label for="node-input-targetAmsNetId"><i class="fa fa-crosshairs"></i> Target AMS Net ID</label>
-    <input type="text" id="node-input-targetAmsNetId">
-  </div>
-  <div class="form-row">
     <label for="node-input-symbol"><i class="fa fa-book"></i> Symbol</label>
     <input type="text" id="node-input-symbol">
   </div>
@@ -39,7 +34,7 @@
 
 <script type="text/x-red" data-help-name="ads-over-mqtt-write-symbols">
   <p>Writes a value to an ADS symbol over MQTT. The value is taken from <code>msg.payload</code>.</p>
-  <p><b>Inputs</b>: <code>msg.symbol</code> and <code>msg.targetAmsNetId</code> can override the configured values.</p>
+  <p><b>Inputs</b>: <code>msg.symbol</code> can override the configured symbol.</p>
   <p><b>Outputs</b>:</p>
   <ol>
     <li><code>msg.payload</code> contains the ADS response (usually an empty Buffer) once acknowledged.</li>
