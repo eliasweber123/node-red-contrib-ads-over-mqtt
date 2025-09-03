@@ -3,6 +3,12 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
+    node.ig =
+      config.ig !== undefined && config.ig !== "" ? parseInt(config.ig, 10) : undefined;
+    node.io =
+      config.io !== undefined && config.io !== "" ? parseInt(config.io, 10) : undefined;
+    node.size =
+      config.size !== undefined && config.size !== "" ? parseInt(config.size, 10) : undefined;
     node.connection = RED.nodes.getNode(config.connection);
 
     if (!node.connection || !node.connection.client) {
@@ -88,26 +94,47 @@ module.exports = function (RED) {
     node.on("input", (msg, send, done) => {
       const symbol = msg.symbol || node.symbol;
       const targetAms = node.connection.targetAmsNetId;
-      if (!symbol) {
-        done(new Error("No symbol specified"));
-        return;
-      }
       if (!targetAms) {
         done(new Error("No target AMS Net ID specified"));
         return;
       }
 
-      const globalContext = node.context().global;
-      const symbols = globalContext.get("symbols") || {};
-      const connSymbols = symbols[node.connection.id] || {};
-      const targetSymbols = connSymbols[targetAms] || {};
-      const symInfo = targetSymbols[symbol];
-      if (!symInfo) {
-        done(new Error("Symbol not found in cache"));
+      let ig = node.ig;
+      let io = node.io;
+      let size = node.size;
+      let symInfo;
+
+      if (ig === undefined || io === undefined || size === undefined) {
+        if (!symbol) {
+          done(new Error("No symbol specified"));
+          return;
+        }
+        const globalContext = node.context().global;
+        const symbols = globalContext.get("symbols") || {};
+        const connSymbols = symbols[node.connection.id] || {};
+        const targetSymbols = connSymbols[targetAms] || {};
+        symInfo = targetSymbols[symbol];
+        if (!symInfo) {
+          done(new Error("Symbol not found in cache"));
+          return;
+        }
+        if (ig === undefined) ig = symInfo.ig;
+        if (io === undefined) io = symInfo.io;
+        if (size === undefined) size = symInfo.size;
+      } else if (symbol) {
+        const globalContext = node.context().global;
+        const symbols = globalContext.get("symbols") || {};
+        const connSymbols = symbols[node.connection.id] || {};
+        const targetSymbols = connSymbols[targetAms] || {};
+        symInfo = targetSymbols[symbol];
+      }
+
+      if (ig === undefined || io === undefined || size === undefined) {
+        done(new Error("Index Group, Offset or Size missing"));
         return;
       }
 
-      const valueBuf = encodeValue(symInfo.datatype, symInfo.size, msg.payload);
+      const valueBuf = encodeValue(symInfo ? symInfo.datatype : undefined, size, msg.payload);
       if (!valueBuf) {
         done(new Error("Unsupported payload format"));
         return;
@@ -116,9 +143,9 @@ module.exports = function (RED) {
       const reqTopic = `${namespace}/${targetAms}/ams`;
 
       const adsWrite = Buffer.alloc(12 + valueBuf.length);
-      adsWrite.writeUInt32LE(symInfo.ig, 0);
-      adsWrite.writeUInt32LE(symInfo.io, 4);
-      adsWrite.writeUInt32LE(symInfo.size, 8);
+      adsWrite.writeUInt32LE(ig, 0);
+      adsWrite.writeUInt32LE(io, 4);
+      adsWrite.writeUInt32LE(size, 8);
       valueBuf.copy(adsWrite, 12);
 
       const amsHeader = Buffer.alloc(32);
