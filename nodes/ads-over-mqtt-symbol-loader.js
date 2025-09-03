@@ -131,21 +131,32 @@ module.exports = function (RED) {
         });
       }
 
-      sendAdsRead(0xf00f, 0, 24, (err, info) => {
-        if (!err && info && info.length >= 24) {
-          const symSize = info.readUInt32LE(4);
-          const datatypeSize = info.readUInt32LE(16);
-          readSymbols(symSize, datatypeSize);
-        } else {
-          sendAdsRead(0xf00c, 0, 24, (err2, info2) => {
-            if (err2 || !info2 || info2.length < 24) {
-              node.warn("Failed to read symbol upload info");
-              return;
-            }
-            const symSize = info2.readUInt32LE(0);
-            readSymbols(symSize, 0);
-          });
+      // UploadInfo2 (0xF00F) – aktuell deaktiviert, da nicht von allen Targets
+      // unterstützt. Kann später wieder aktiviert werden.
+      // sendAdsRead(0xf00f, 0, 24, (err, info) => {
+      //   if (!err && info && info.length >= 24) {
+      //     const symSize = info.readUInt32LE(4);
+      //     const datatypeSize = info.readUInt32LE(16);
+      //     readSymbols(symSize, datatypeSize);
+      //   } else {
+      //     sendAdsRead(0xf00c, 0, 24, (err2, info2) => {
+      //       if (err2 || !info2 || info2.length < 24) {
+      //         node.warn("Failed to read symbol upload info");
+      //         return;
+      //       }
+      //       const symSize = info2.readUInt32LE(0);
+      //       readSymbols(symSize, 0);
+      //     });
+      //   }
+      // });
+
+      sendAdsRead(0xf00c, 0, 24, (err, info) => {
+        if (err || !info || info.length < 24) {
+          node.warn("Failed to read symbol upload info");
+          return;
         }
+        const symSize = info.readUInt32LE(0);
+        readSymbols(symSize, 0);
       });
     }
 
