@@ -9,6 +9,7 @@ module.exports = function (RED) {
       config.io !== undefined && config.io !== "" ? parseInt(config.io, 10) : undefined;
     node.size =
       config.size !== undefined && config.size !== "" ? parseInt(config.size, 10) : undefined;
+    node.typeName = config.typeName;
     node.connection = RED.nodes.getNode(config.connection);
 
     if (!node.connection || !node.connection.client) {
@@ -31,41 +32,86 @@ module.exports = function (RED) {
       return Buffer.from(id.split('.').map((n) => parseInt(n, 10)));
     }
 
-    function encodeValue(datatype, size, payload) {
+    function encodeValue(typeName, size, payload) {
       if (Buffer.isBuffer(payload)) {
-        if (payload.length !== size) return null;
-        return payload;
+        return payload.length === size ? payload : null;
       }
       const buf = Buffer.alloc(size);
-      if (typeof payload === "number") {
-        switch (size) {
-          case 1:
+      switch (typeName) {
+        case "BOOL":
+          if (typeof payload === "boolean" || typeof payload === "number") {
+            buf.writeUInt8(payload ? 1 : 0);
+            return buf;
+          }
+          return null;
+        case "BYTE":
+          if (typeof payload === "number") {
             buf.writeUInt8(payload);
             return buf;
-          case 2:
+          }
+          return null;
+        case "WORD":
+          if (typeof payload === "number") {
             buf.writeUInt16LE(payload);
             return buf;
-          case 4:
+          }
+          return null;
+        case "DWORD":
+          if (typeof payload === "number") {
             buf.writeUInt32LE(payload);
             return buf;
-          case 8:
-            buf.writeDoubleLE(payload);
+          }
+          return null;
+        case "REAL":
+          if (typeof payload === "number") {
+            buf.writeFloatLE(payload);
             return buf;
-          default:
-            return null;
-        }
+          }
+          return null;
+        case "STRING":
+          if (typeof payload === "string") {
+            const strBuf = Buffer.from(payload, "utf8");
+            if (strBuf.length >= size) {
+              strBuf.slice(0, size - 1).copy(buf);
+              buf[size - 1] = 0;
+            } else {
+              strBuf.copy(buf);
+              buf[strBuf.length] = 0;
+            }
+            return buf;
+          }
+          return null;
+        default:
+          if (typeof payload === "number") {
+            if (size === 1) {
+              buf.writeUInt8(payload);
+              return buf;
+            }
+            if (size === 2) {
+              buf.writeUInt16LE(payload);
+              return buf;
+            }
+            if (size === 4) {
+              buf.writeUInt32LE(payload);
+              return buf;
+            }
+            if (size === 8) {
+              buf.writeDoubleLE(payload);
+              return buf;
+            }
+          }
+          if (typeof payload === "boolean" && size === 1) {
+            buf.writeUInt8(payload ? 1 : 0);
+            return buf;
+          }
+          if (typeof payload === "string") {
+            const strBuf = Buffer.from(payload, "ascii");
+            if (strBuf.length > size) return null;
+            strBuf.copy(buf);
+            return buf;
+          }
+          return null;
       }
-      if (typeof payload === "boolean" && size === 1) {
-        buf.writeUInt8(payload ? 1 : 0);
-        return buf;
-      }
-      if (typeof payload === "string") {
-        const strBuf = Buffer.from(payload, "ascii");
-        if (strBuf.length > size) return null;
-        strBuf.copy(buf);
-        return buf;
-      }
-      return null;
     }
 
     node.connection.client.on("message", (topic, message) => {
@@ -102,39 +148,34 @@ module.exports = function (RED) {
       let ig = node.ig;
       let io = node.io;
       let size = node.size;
-      let symInfo;
+      let typeName = node.typeName;
 
-      if (ig === undefined || io === undefined || size === undefined) {
+      if (ig === undefined || io === undefined || size === undefined || !typeName) {
         if (!symbol) {
           done(new Error("No symbol specified"));
           return;
         }
-        const globalContext = node.context().global;
-        const symbols = globalContext.get("symbols") || {};
-        const connSymbols = symbols[node.connection.id] || {};
-        const targetSymbols = connSymbols[targetAms] || {};
-        symInfo = targetSymbols[symbol];
+        const flowContext = node.context().flow;
+        const symbols = flowContext.get("symbols") || {};
+        const key = `${namespace}/${targetAms}`;
+        const symArray = symbols[key] || [];
+        const symInfo = symArray.find((s) => s.name === symbol);
         if (!symInfo) {
           done(new Error("Symbol not found in cache"));
           return;
         }
-        if (ig === undefined) ig = symInfo.ig;
-        if (io === undefined) io = symInfo.io;
+        if (ig === undefined) ig = symInfo.indexGroup;
+        if (io === undefined) io = symInfo.indexOffset;
         if (size === undefined) size = symInfo.size;
-      } else if (symbol) {
-        const globalContext = node.context().global;
-        const symbols = globalContext.get("symbols") || {};
-        const connSymbols = symbols[node.connection.id] || {};
-        const targetSymbols = connSymbols[targetAms] || {};
-        symInfo = targetSymbols[symbol];
+        if (!typeName) typeName = symInfo.typeName;
       }
 
-      if (ig === undefined || io === undefined || size === undefined) {
-        done(new Error("Index Group, Offset or Size missing"));
+      if (ig === undefined || io === undefined || size === undefined || !typeName) {
+        done(new Error("Index Group, Offset, Size or Type missing"));
         return;
       }
 
-      const valueBuf = encodeValue(symInfo ? symInfo.datatype : undefined, size, msg.payload);
+      const valueBuf = encodeValue(typeName, size, msg.payload);
       if (!valueBuf) {
         done(new Error("Unsupported payload format"));
         return;

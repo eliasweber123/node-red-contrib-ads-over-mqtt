@@ -9,6 +9,7 @@ module.exports = function (RED) {
       config.io !== undefined && config.io !== "" ? parseInt(config.io, 10) : undefined;
     node.size =
       config.size !== undefined && config.size !== "" ? parseInt(config.size, 10) : undefined;
+    node.typeName = config.typeName;
     node.connection = RED.nodes.getNode(config.connection);
 
     if (!node.connection || !node.connection.client) {
@@ -31,6 +32,29 @@ module.exports = function (RED) {
       return Buffer.from(id.split('.').map((n) => parseInt(n, 10)));
     }
 
+    function decodeValue(typeName, size, buffer) {
+      if (!Buffer.isBuffer(buffer)) return buffer;
+      switch (typeName) {
+        case "BOOL":
+          return buffer.readUInt8(0) !== 0;
+        case "BYTE":
+          return buffer.readUInt8(0);
+        case "WORD":
+          return buffer.readUInt16LE(0);
+        case "DWORD":
+          return buffer.readUInt32LE(0);
+        case "REAL":
+          return buffer.readFloatLE(0);
+        case "STRING": {
+          let end = buffer.indexOf(0);
+          if (end === -1 || end > size) end = size;
+          return buffer.slice(0, end).toString("utf8");
+        }
+        default:
+          return buffer;
+      }
+    }
+
     node.connection.client.on("message", (topic, message) => {
       if (topic !== resTopic) return;
       if (!Buffer.isBuffer(message) || message.length < 40) {
@@ -46,8 +70,9 @@ module.exports = function (RED) {
       const data = message.slice(40, 40 + len);
 
       delete node.pendingRequests[invokeId];
+      const value = decodeValue(pending.typeName, pending.size || len, data);
       pending.send([
-        { payload: data, symbol: pending.symbol, invokeId, result },
+        { payload: value, symbol: pending.symbol, invokeId, result },
         null,
         null,
       ]);
@@ -65,28 +90,30 @@ module.exports = function (RED) {
       let ig = node.ig;
       let io = node.io;
       let size = node.size;
+      let typeName = node.typeName;
 
-      if (ig === undefined || io === undefined || size === undefined) {
+      if (ig === undefined || io === undefined || size === undefined || !typeName) {
         if (!symbol) {
           done(new Error("No symbol specified"));
           return;
         }
-        const globalContext = node.context().global;
-        const symbols = globalContext.get("symbols") || {};
-        const connSymbols = symbols[node.connection.id] || {};
-        const targetSymbols = connSymbols[targetAms] || {};
-        const symInfo = targetSymbols[symbol];
+        const flowContext = node.context().flow;
+        const symbols = flowContext.get("symbols") || {};
+        const key = `${namespace}/${targetAms}`;
+        const symArray = symbols[key] || [];
+        const symInfo = symArray.find((s) => s.name === symbol);
         if (!symInfo) {
           done(new Error("Symbol not found in cache"));
           return;
         }
-        if (ig === undefined) ig = symInfo.ig;
-        if (io === undefined) io = symInfo.io;
+        if (ig === undefined) ig = symInfo.indexGroup;
+        if (io === undefined) io = symInfo.indexOffset;
         if (size === undefined) size = symInfo.size;
+        if (!typeName) typeName = symInfo.typeName;
       }
 
-      if (ig === undefined || io === undefined || size === undefined) {
-        done(new Error("Index Group, Offset or Size missing"));
+      if (ig === undefined || io === undefined || size === undefined || !typeName) {
+        done(new Error("Index Group, Offset, Size or Type missing"));
         return;
       }
 
@@ -118,7 +145,7 @@ module.exports = function (RED) {
         { payload: frame, topic: reqTopic },
       ]);
 
-      node.pendingRequests[invokeId] = { symbol, send, done };
+      node.pendingRequests[invokeId] = { symbol, send, done, size, typeName };
       node.connection.client.publish(reqTopic, frame, {
         qos: 0,
         retain: false,
