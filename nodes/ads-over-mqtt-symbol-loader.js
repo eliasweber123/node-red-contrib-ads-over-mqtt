@@ -107,9 +107,25 @@ module.exports = function (RED) {
           .toString("utf8")
           .replace(/\0+$/, "");
 
-        const typeStart = nameStart + nameLength;
+        let typeStart = nameStart + nameLength;
+        let typeLen = typeLength;
+        if (typeLen > 0 && buffer[typeStart] === 0x00) {
+          typeStart += 1;
+          typeLen -= 1;
+        }
         const typeName = buffer
-          .slice(typeStart, typeStart + typeLength)
+          .slice(typeStart, typeStart + typeLen)
+          .toString("utf8")
+          .replace(/\0+$/, "");
+
+        let commentStart = typeStart + typeLen;
+        let commentLen = commentLength;
+        if (commentLen > 0 && buffer[commentStart] === 0x00) {
+          commentStart += 1;
+          commentLen -= 1;
+        }
+        const comment = buffer
+          .slice(commentStart, commentStart + commentLen)
           .toString("utf8")
           .replace(/\0+$/, "");
 
@@ -120,6 +136,7 @@ module.exports = function (RED) {
           indexOffset,
           size,
           typeName,
+          comment,
           dataType,
           flags,
         });
