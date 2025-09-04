@@ -19,9 +19,13 @@ ADS symbols using MQTT messages.
   Outputs two and three provide hex and raw debug frames of the ADS requests.
 - **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol
   using the cached symbol information. The symbol can be configured in the node
-  or supplied as `msg.symbol`.
+  or supplied as `msg.symbol`. Activating the *Manuelle Werte verwenden* option
+  reveals fields for Index Group, Index Offset, Size and Type which, when set,
+  are used instead of the cached symbol data.
 - **ads-over-mqtt-write-symbols** – writes a value from `msg.payload` to the
-  specified ADS symbol using the cached symbol information.
+  specified ADS symbol using the cached symbol information. Enabling *Manuelle
+  Werte verwenden* allows manual entry of Index Group, Index Offset, Size and
+  Type which take precedence over cached values.
 - **ads-over-mqtt-info** – publishes a static info message to
   `<topic>/<localAmsNetId>/info` when triggered via its button.
 
