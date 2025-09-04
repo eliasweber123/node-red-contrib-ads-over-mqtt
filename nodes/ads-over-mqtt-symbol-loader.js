@@ -87,8 +87,11 @@ module.exports = function (RED) {
     function parseSymbols(buffer) {
       const symbols = [];
       let offset = 0;
-      while (offset < buffer.length) {
+      while (offset + 30 <= buffer.length) {
         const entryLen = buffer.readUInt32LE(offset);
+        if (entryLen < 30 || offset + entryLen > buffer.length) {
+          break;
+        }
         const indexGroup = buffer.readUInt32LE(offset + 4);
         const indexOffset = buffer.readUInt32LE(offset + 8);
         const size = buffer.readUInt32LE(offset + 12);
@@ -97,16 +100,20 @@ module.exports = function (RED) {
         const nameLength = buffer.readUInt16LE(offset + 24);
         const typeLength = buffer.readUInt16LE(offset + 26);
         const commentLength = buffer.readUInt16LE(offset + 28);
+
         const nameStart = offset + 30;
         const name = buffer
           .slice(nameStart, nameStart + nameLength)
           .toString("utf8")
-          .replace(/\0.*$/, "");
+          .replace(/\0+$/, "");
+
+        const typeStart = nameStart + nameLength;
         const typeName = buffer
-          .slice(nameStart + nameLength, nameStart + nameLength + typeLength)
+          .slice(typeStart, typeStart + typeLength)
           .toString("utf8")
-          .replace(/\0.*$/, "");
-        // Skip comment and any padding by relying on entryLen for the next offset
+          .replace(/\0+$/, "");
+
+        // Move to the next entry based on the provided entry length
         symbols.push({
           name,
           indexGroup,
