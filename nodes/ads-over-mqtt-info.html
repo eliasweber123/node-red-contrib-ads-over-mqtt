@@ -1,0 +1,40 @@
+<script type="text/javascript">
+  RED.nodes.registerType('ads-over-mqtt-info', {
+    category: 'function',
+    color: '#a6bbcf',
+    defaults: {
+      name: {value:""},
+      connection: {type:"ads-over-mqtt-client-connection", required:true}
+    },
+    inputs: 0,
+    outputs: 0,
+    icon: 'bridge.png',
+    label: function() {
+      return this.name || 'ads info';
+    },
+    button: {
+      onclick: function() {
+        var node = this;
+        $.ajax({
+          type: "POST",
+          url: "ads-over-mqtt-info/" + node.id + "/publish"
+        });
+      }
+    }
+  });
+</script>
+
+<script type="text/x-red" data-template-name="ads-over-mqtt-info">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name">
+  </div>
+  <div class="form-row">
+    <label for="node-input-connection"><i class="fa fa-plug"></i> Connection</label>
+    <input type="text" id="node-input-connection">
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="ads-over-mqtt-info">
+  <p>Publishes an info message on <code>&lt;topic&gt;/&lt;localAmsNetId&gt;/info</code> using the configured ADS over MQTT connection. Click the button to send the message.</p>
+</script>

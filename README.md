@@ -1,0 +1,106 @@
+# node-red-contrib-ads-over-mqtt
+
+This repository provides a set of [Node-RED](https://nodered.org/) nodes for
+communicating with Beckhoff TwinCAT ADS devices over an MQTT broker. The nodes
+are intended as a starting point for building flows that read from and write to
+ADS symbols using MQTT messages.
+
+## Nodes
+
+- **ads-over-mqtt-client-connection** – configuration node that establishes the MQTT
+  connection and holds AMS routing parameters, including the Target AMS Net ID.
+  This is the only place where the Target AMS Net ID is set. All other nodes
+  use the value from the connection node. It also defines the internal
+  MQTT topic prefix used for ADS messages.
+- **ads-over-mqtt-symbol-loader** – on trigger, requests the symbol upload
+  information and complete symbol table from a target. The parsed symbol list is
+  sent on the first output and includes `msg.count` and `msg.size`. The list is
+  cached in `flow.symbols` (namespaced by topic and target) and `global.symbols`.
+  Outputs two and three provide hex and raw debug frames of the ADS requests.
+- **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol
+  using the cached symbol information. The symbol can be configured in the node
+  or supplied as `msg.symbol`.
+- **ads-over-mqtt-write-symbols** – writes a value from `msg.payload` to the
+  specified ADS symbol using the cached symbol information.
+- **ads-over-mqtt-info** – publishes a static info message to
+  `<topic>/<localAmsNetId>/info` when triggered via its button.
+
+These nodes publish requests to `<topic>/<targetAmsNetId>/ams` and listen
+for responses on `<topic>/<sourceAmsNetId>/ams/res`. The `<targetAmsNetId>`
+and `<topic>` are configured in the connection node.
+
+Payloads are raw ADS/AMS frames. Within Node-RED flows they are represented as
+Buffers. When serialising to JSON (for example for MQTT nodes), the Buffer can
+be expressed as an object
+
+```json
+{"type": "ams", "encoding": "base64", "data": "<base64>"}
+```
+
+### Example
+
+```js
+// Read value of symbol 'MAIN.myVar'
+msg.symbol = 'MAIN.myVar';
+return msg;
+```
+
+If you need to inject a frame manually:
+
+```js
+// Request frame as Buffer
+const req = Buffer.from(
+  '00003b00000006050403020153030102030405065303090004001b000000000000000100000003f0000000000000040000000b0000004d41494e2e6d7956617200',
+  'hex'
+);
+msg.payload = req; // Buffer form
+return msg;
+```
+
+The same frame encoded in Base64:
+
+```json
+{"type":"ams","encoding":"base64","data":"AAA7AAAABgUEAwIBUwMBAgMEBQZTAwkABAAbAAAAAAAAAAEAAAAD8AAAAAAAAAQAAAALAAAATUFJTi5teVZhcgA="}
+```
+
+An example response for the above request:
+
+```json
+{
+  "type": "ams",
+  "encoding": "base64",
+  "data": "AAAsAAAAAQIDBAUGUwMGBQQDAgFTAwkABQAMAAAAAAAAAAEAAAAAAAAABAAAAHhWNBI="
+}
+```
+
+The read node outputs the response data in `msg.payload` as a Buffer. Both read
+and write nodes emit the hex representation of the request frame on their second
+output and the raw request frame Buffer on their third output; both debug
+outputs also include the MQTT topic in `msg.topic`. The write node forwards an
+empty Buffer on success. Both nodes include the `invokeId` and ADS result code
+in the message.
+
+## Development
+
+1. Install dependencies
+
+   ```bash
+   npm install
+   ```
+
+2. Run tests
+
+   ```bash
+   npm test
+   ```
+
+3. Link the package into your local Node-RED instance during development:
+
+   ```bash
+   npm link
+   ```
+
+## License
+
+MIT License
+
