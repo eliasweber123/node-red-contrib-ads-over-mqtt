@@ -19,7 +19,6 @@ module.exports = function (RED) {
 
     node.pendingRequests = {};
     node._invokeId = 1;
-    node.symbolsAvailable = false;
 
     function amsNetIdToBuffer(id) {
       return Buffer.from(id.split('.').map((n) => parseInt(n, 10)));
@@ -35,6 +34,7 @@ module.exports = function (RED) {
       const pending = node.pendingRequests[invokeId];
       if (!pending) return;
 
+      clearTimeout(pending.timer);
       const result = message.readUInt32LE(32);
       const len = message.readUInt32LE(36);
       const data = message.slice(40, 40 + len);
@@ -59,16 +59,23 @@ module.exports = function (RED) {
       amsNetIdToBuffer(node.connection.amsNetId).copy(amsHeader, 8);
       amsHeader.writeUInt16LE(node.connection.sourcePort, 14);
       amsHeader.writeUInt16LE(0x0002, 16); // CmdID Read
-      amsHeader.writeUInt16LE(0x0004, 18);
+      amsHeader.writeUInt16LE(0x0004, 18); // StateFlags
       amsHeader.writeUInt32LE(adsRead.length, 20);
       amsHeader.writeUInt32LE(0, 24);
       const invokeId = node._invokeId++ & 0xffffffff;
       amsHeader.writeUInt32LE(invokeId, 28);
 
       const frame = Buffer.concat([amsHeader, adsRead]);
-
-      node.pendingRequests[invokeId] = { callback: cb };
       const reqTopic = `${namespace}/${node.connection.targetAmsNetId}/ams`;
+
+      node.pendingRequests[invokeId] = {
+        callback: cb,
+        timer: setTimeout(() => {
+          delete node.pendingRequests[invokeId];
+          cb(new Error("Timeout"));
+        }, 5000),
+      };
+
       node.send([
         null,
         { payload: frame.toString("hex"), topic: reqTopic },
@@ -78,7 +85,7 @@ module.exports = function (RED) {
     }
 
     function parseSymbols(buffer) {
-      const symbols = {};
+      const symbols = [];
       let offset = 0;
       while (offset < buffer.length) {
         const entryLen = buffer.readUInt32LE(offset);
@@ -86,73 +93,90 @@ module.exports = function (RED) {
         const indexOffset = buffer.readUInt32LE(offset + 8);
         const size = buffer.readUInt32LE(offset + 12);
         const dataType = buffer.readUInt32LE(offset + 16);
-        // skip flags
         const nameLength = buffer.readUInt16LE(offset + 24);
         const typeLength = buffer.readUInt16LE(offset + 26);
-        const commentLength = buffer.readUInt16LE(offset + 28);
+        // const commentLength = buffer.readUInt16LE(offset + 28);
         const nameStart = offset + 30;
         const name = buffer
           .slice(nameStart, nameStart + nameLength - 1)
           .toString("utf8");
-        symbols[name] = {
-          ig: indexGroup,
-          io: indexOffset,
+        const typeName = buffer
+          .slice(
+            nameStart + nameLength,
+            nameStart + nameLength + typeLength - 1
+          )
+          .toString("utf8");
+        symbols.push({
+          name,
+          indexGroup,
+          indexOffset,
           size,
-          datatype: dataType,
-        };
+          typeName,
+          dataType,
+        });
         offset += entryLen;
       }
       return symbols;
     }
 
     function loadSymbols() {
-      node.symbolsAvailable = false;
+      node.status({ fill: "blue", shape: "dot", text: "loading" });
+      sendAdsRead(0xf00c, 0, 24, (err, info) => {
+        if (err || !info || info.length < 8) {
+          node.status({ fill: "red", shape: "ring", text: "uploadInfo" });
+          node.error(err || new Error("Failed to read symbol upload info"));
+          return;
+        }
+        const symCount = info.readUInt32LE(0);
+        const symSize = info.readUInt32LE(4);
+        if (symSize === 0) {
+          node.status({ fill: "red", shape: "ring", text: "empty" });
+          node.error(new Error("Symbol table empty"));
+          return;
+        }
 
-      function readSymbols(symSize, datatypeSize) {
         sendAdsRead(0xf00b, 0, symSize, (err2, table) => {
           if (err2 || !table) {
-            node.warn("Failed to read symbol table");
+            node.status({ fill: "red", shape: "ring", text: "symbol upload" });
+            node.error(err2 || new Error("Failed to read symbol table"));
             return;
           }
           const symbols = parseSymbols(table);
+
+          // store in flow context namespaced by topic/target
+          const flowContext = node.context().flow;
+          const flowSymbols = flowContext.get("symbols") || {};
+          const key = `${namespace}/${node.connection.targetAmsNetId}`;
+          flowSymbols[key] = symbols;
+          flowContext.set("symbols", flowSymbols);
+
+          // store in global for compatibility
           const globalContext = node.context().global;
           const all = globalContext.get("symbols") || {};
           if (!all[node.connection.id]) all[node.connection.id] = {};
-          all[node.connection.id][node.connection.targetAmsNetId] = symbols;
+          const target = {};
+          symbols.forEach((s) => {
+            target[s.name] = {
+              ig: s.indexGroup,
+              io: s.indexOffset,
+              size: s.size,
+              datatype: s.dataType,
+            };
+          });
+          all[node.connection.id][node.connection.targetAmsNetId] = target;
           globalContext.set("symbols", all);
-          if (datatypeSize > 0) {
-            sendAdsRead(0xf00e, 0, datatypeSize, () => {});
-          }
-          node.symbolsAvailable = true;
+
+          node.status({
+            fill: "green",
+            shape: "dot",
+            text: `${symbols.length} symbols`,
+          });
+          node.send([
+            { payload: symbols, count: symCount, size: symSize },
+            null,
+            null,
+          ]);
         });
-      }
-
-      // UploadInfo2 (0xF00F) – aktuell deaktiviert, da nicht von allen Targets
-      // unterstützt. Kann später wieder aktiviert werden.
-      // sendAdsRead(0xf00f, 0, 24, (err, info) => {
-      //   if (!err && info && info.length >= 24) {
-      //     const symSize = info.readUInt32LE(4);
-      //     const datatypeSize = info.readUInt32LE(16);
-      //     readSymbols(symSize, datatypeSize);
-      //   } else {
-      //     sendAdsRead(0xf00c, 0, 24, (err2, info2) => {
-      //       if (err2 || !info2 || info2.length < 24) {
-      //         node.warn("Failed to read symbol upload info");
-      //         return;
-      //       }
-      //       const symSize = info2.readUInt32LE(0);
-      //       readSymbols(symSize, 0);
-      //     });
-      //   }
-      // });
-
-      sendAdsRead(0xf00c, 0, 24, (err, info) => {
-        if (err || !info || info.length < 24) {
-          node.warn("Failed to read symbol upload info");
-          return;
-        }
-        const symSize = info.readUInt32LE(0);
-        readSymbols(symSize, 0);
       });
     }
 
@@ -160,20 +184,8 @@ module.exports = function (RED) {
       loadSymbols();
     });
 
-    node.interval = setInterval(() => {
-      node.send([
-        {
-          payload: node.symbolsAvailable
-            ? "Symbols available"
-            : "Symbols not available",
-        },
-        null,
-        null,
-      ]);
-    }, 5000);
-
     node.on("close", () => {
-      if (node.interval) clearInterval(node.interval);
+      Object.values(node.pendingRequests).forEach((p) => clearTimeout(p.timer));
     });
   }
 

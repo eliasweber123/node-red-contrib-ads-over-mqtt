@@ -12,10 +12,11 @@ ADS symbols using MQTT messages.
   This is the only place where the Target AMS Net ID is set. All other nodes
   use the value from the connection node. It also defines the internal
   MQTT topic prefix used for ADS messages.
-- **ads-over-mqtt-symbol-loader** – loads the complete symbol table from a
-  target and caches it in `global.symbols`. It triggers on input and reports the
-  status every 5 seconds on its first output. The second and third outputs
-  provide hex and raw debug frames of the ADS requests.
+- **ads-over-mqtt-symbol-loader** – on trigger, requests the symbol upload
+  information and complete symbol table from a target. The parsed symbol list is
+  sent on the first output and includes `msg.count` and `msg.size`. The list is
+  cached in `flow.symbols` (namespaced by topic and target) and `global.symbols`.
+  Outputs two and three provide hex and raw debug frames of the ADS requests.
 - **ads-over-mqtt-client-read-symbols** – reads the value of a given ADS symbol
   using the cached symbol information. The symbol can be configured in the node
   or supplied as `msg.symbol`.
