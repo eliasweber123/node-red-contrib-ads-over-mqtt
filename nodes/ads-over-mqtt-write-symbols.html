@@ -11,13 +11,15 @@
           return v || (
             $("#node-input-ig").val() !== "" &&
             $("#node-input-io").val() !== "" &&
-            $("#node-input-size").val() !== ""
+            $("#node-input-size").val() !== "" &&
+            $("#node-input-typeName").val() !== ""
           );
         }
       },
       ig: {value:""},
       io: {value:""},
-      size: {value:""}
+      size: {value:""},
+      typeName: {value:""}
     },
     inputs: 1,
     outputs: 3,
@@ -54,10 +56,22 @@
     <label for="node-input-size"><i class="fa fa-arrows-h"></i> Size</label>
     <input type="number" id="node-input-size">
   </div>
+  <div class="form-row">
+    <label for="node-input-typeName"><i class="fa fa-list"></i> Type</label>
+    <select id="node-input-typeName">
+      <option value=""></option>
+      <option value="BOOL">BOOL</option>
+      <option value="BYTE">BYTE</option>
+      <option value="WORD">WORD</option>
+      <option value="DWORD">DWORD</option>
+      <option value="REAL">REAL</option>
+      <option value="STRING">STRING</option>
+    </select>
+  </div>
 </script>
 
 <script type="text/x-red" data-help-name="ads-over-mqtt-write-symbols">
-  <p>Writes a value to an ADS symbol over MQTT. The value is taken from <code>msg.payload</code>. Index Group, Index Offset and Size may be set manually and take precedence over cached symbol information.</p>
+  <p>Writes a value to an ADS symbol over MQTT. The value is taken from <code>msg.payload</code>. Index Group, Index Offset, Size and Type may be set manually and take precedence over cached symbol information.</p>
   <p>A symbol is only required if any of the manual fields are not provided. <code>msg.symbol</code> can override the configured symbol.</p>
   <p><b>Outputs</b>:</p>
   <ol>
