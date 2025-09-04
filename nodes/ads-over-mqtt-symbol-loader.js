@@ -111,7 +111,6 @@ module.exports = function (RED) {
         let typeLen = typeLength;
         if (typeLen > 0 && buffer[typeStart] === 0x00) {
           typeStart += 1;
-          typeLen -= 1;
         }
         const typeName = buffer
           .slice(typeStart, typeStart + typeLen)
@@ -122,7 +121,6 @@ module.exports = function (RED) {
         let commentLen = commentLength;
         if (commentLen > 0 && buffer[commentStart] === 0x00) {
           commentStart += 1;
-          commentLen -= 1;
         }
         const comment = buffer
           .slice(commentStart, commentStart + commentLen)
