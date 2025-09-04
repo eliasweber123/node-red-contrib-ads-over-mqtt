@@ -10,7 +10,7 @@
       "ads-over-mqtt-client-read-symbols": "nodes/ads-over-mqtt-client-read-symbols.js",
       "ads-over-mqtt-write-symbols": "nodes/ads-over-mqtt-write-symbols.js",
       "ads-over-mqtt-symbol-loader": "nodes/ads-over-mqtt-symbol-loader.js",
-      "ads-over-mqtt-debug": "nodes/ads-over-mqtt-debug.js"
+      "ads-over-mqtt-info": "nodes/ads-over-mqtt-info.js"
     }
   },
   "dependencies": {

@@ -21,8 +21,8 @@ ADS symbols using MQTT messages.
   or supplied as `msg.symbol`.
 - **ads-over-mqtt-write-symbols** – writes a value from `msg.payload` to the
   specified ADS symbol using the cached symbol information.
-- **ads-over-mqtt-debug** – subscribes to a topic via the configured connection
-  and outputs incoming messages as Buffers.
+- **ads-over-mqtt-info** – publishes a static info message to
+  `<topic>/<localAmsNetId>/info` when triggered via its button.
 
 These nodes publish requests to `<topic>/<targetAmsNetId>/ams` and listen
 for responses on `<topic>/<sourceAmsNetId>/ams/res`. The `<targetAmsNetId>`
