@@ -33,17 +33,17 @@ module.exports = function (RED) {
 
     node.connection.client.on("message", (topic, message) => {
       if (topic !== resTopic) return;
-      if (!Buffer.isBuffer(message) || message.length < 46) {
+      if (!Buffer.isBuffer(message) || message.length < 40) {
         node.error("Invalid AMS response frame");
         return;
       }
-      const invokeId = message.readUInt32LE(34);
+      const invokeId = message.readUInt32LE(28);
       const pending = node.pendingRequests[invokeId];
       if (!pending) return;
 
-      const result = message.readUInt32LE(38);
-      const len = message.readUInt32LE(42);
-      const data = message.slice(46, 46 + len);
+      const result = message.readUInt32LE(32);
+      const len = message.readUInt32LE(36);
+      const data = message.slice(40, 40 + len);
 
       delete node.pendingRequests[invokeId];
       pending.send([
@@ -109,11 +109,7 @@ module.exports = function (RED) {
       const invokeId = node._invokeId++ & 0xffffffff;
       amsHeader.writeUInt32LE(invokeId, 28);
 
-      const tcpHeader = Buffer.alloc(6);
-      tcpHeader.writeUInt16LE(0, 0);
-      tcpHeader.writeUInt32LE(amsHeader.length + adsRead.length, 2);
-
-      const frame = Buffer.concat([tcpHeader, amsHeader, adsRead]);
+      const frame = Buffer.concat([amsHeader, adsRead]);
       const hex = frame.toString("hex");
 
       send([
@@ -123,7 +119,10 @@ module.exports = function (RED) {
       ]);
 
       node.pendingRequests[invokeId] = { symbol, send, done };
-      node.connection.client.publish(reqTopic, frame);
+      node.connection.client.publish(reqTopic, frame, {
+        qos: 0,
+        retain: false,
+      });
     });
   }
 
