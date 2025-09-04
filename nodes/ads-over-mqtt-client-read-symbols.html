@@ -8,18 +8,37 @@
       symbol: {
         value:"",
         validate: function(v) {
-          return v || (
-            $("#node-input-ig").val() !== "" &&
-            $("#node-input-io").val() !== "" &&
-            $("#node-input-size").val() !== "" &&
-            $("#node-input-typeName").val() !== ""
-          );
+          if ($("#node-input-manual").is(":checked")) {
+            return true;
+          }
+          return v !== "";
         }
       },
-      ig: {value:""},
-      io: {value:""},
-      size: {value:""},
-      typeName: {value:""}
+      manual: {value:false},
+      ig: {
+        value:"",
+        validate: function(v) {
+          return !$("#node-input-manual").is(":checked") || v !== "";
+        }
+      },
+      io: {
+        value:"",
+        validate: function(v) {
+          return !$("#node-input-manual").is(":checked") || v !== "";
+        }
+      },
+      size: {
+        value:"",
+        validate: function(v) {
+          return !$("#node-input-manual").is(":checked") || v !== "";
+        }
+      },
+      typeName: {
+        value:"",
+        validate: function(v) {
+          return !$("#node-input-manual").is(":checked") || v !== "";
+        }
+      }
     },
     inputs: 1,
     outputs: 3,
@@ -27,6 +46,14 @@
     icon: "bridge.png",
     label: function() {
       return this.name || this.symbol || 'ads read';
+    },
+    oneditprepare: function() {
+      function toggleManual() {
+        var show = $("#node-input-manual").is(":checked");
+        $(".ads-manual").toggle(show);
+      }
+      $("#node-input-manual").on("change", toggleManual);
+      toggleManual();
     }
   });
 </script>
@@ -45,18 +72,23 @@
     <input type="text" id="node-input-symbol">
   </div>
   <div class="form-row">
+    <label>&nbsp;</label>
+    <input type="checkbox" id="node-input-manual" style="width:auto; margin-left:0;">
+    <label for="node-input-manual" style="width:auto;">Manuelle Werte verwenden</label>
+  </div>
+  <div class="form-row ads-manual">
     <label for="node-input-ig"><i class="fa fa-list-ol"></i> Index Group</label>
     <input type="number" id="node-input-ig">
   </div>
-  <div class="form-row">
+  <div class="form-row ads-manual">
     <label for="node-input-io"><i class="fa fa-list-ol"></i> Index Offset</label>
     <input type="number" id="node-input-io">
   </div>
-  <div class="form-row">
+  <div class="form-row ads-manual">
     <label for="node-input-size"><i class="fa fa-arrows-h"></i> Size</label>
     <input type="number" id="node-input-size">
   </div>
-  <div class="form-row">
+  <div class="form-row ads-manual">
     <label for="node-input-typeName"><i class="fa fa-list"></i> Type</label>
     <select id="node-input-typeName">
       <option value=""></option>
@@ -71,8 +103,8 @@
 </script>
 
 <script type="text/x-red" data-help-name="ads-over-mqtt-client-read-symbols">
-  <p>Reads a value from an ADS device over MQTT. You may manually specify the Index Group, Index Offset, Size and Type; when provided, these override any values from the cached symbol information.</p>
-  <p>A symbol is only required if any of the manual fields are left blank. <code>msg.symbol</code> can override the configured symbol.</p>
+  <p>Reads a value from an ADS device over MQTT. Enable <i>Manuelle Werte verwenden</i> to manually specify the Index Group, Index Offset, Size and Type. When disabled, these values are taken from the cached symbol information.</p>
+  <p>A symbol is required when manual values are not used. <code>msg.symbol</code> can override the configured symbol.</p>
   <p><b>Outputs</b>:</p>
   <ol>
     <li><code>msg.payload</code> contains the decoded value of the symbol.</li>

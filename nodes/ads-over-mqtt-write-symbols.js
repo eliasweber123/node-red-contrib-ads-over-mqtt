@@ -3,6 +3,7 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
     node.symbol = config.symbol;
+    node.manual = config.manual;
     node.ig =
       config.ig !== undefined && config.ig !== "" ? parseInt(config.ig, 10) : undefined;
     node.io =
@@ -145,12 +146,17 @@ module.exports = function (RED) {
         return;
       }
 
-      let ig = node.ig;
-      let io = node.io;
-      let size = node.size;
-      let typeName = node.typeName;
-
-      if (ig === undefined || io === undefined || size === undefined || !typeName) {
+      let ig, io, size, typeName;
+      if (node.manual) {
+        ig = node.ig;
+        io = node.io;
+        size = node.size;
+        typeName = node.typeName;
+        if (ig === undefined || io === undefined || size === undefined || !typeName) {
+          done(new Error("Index Group, Offset, Size or Type missing"));
+          return;
+        }
+      } else {
         if (!symbol) {
           done(new Error("No symbol specified"));
           return;
@@ -164,15 +170,10 @@ module.exports = function (RED) {
           done(new Error("Symbol not found in cache"));
           return;
         }
-        if (ig === undefined) ig = symInfo.indexGroup;
-        if (io === undefined) io = symInfo.indexOffset;
-        if (size === undefined) size = symInfo.size;
-        if (!typeName) typeName = symInfo.typeName;
-      }
-
-      if (ig === undefined || io === undefined || size === undefined || !typeName) {
-        done(new Error("Index Group, Offset, Size or Type missing"));
-        return;
+        ig = symInfo.indexGroup;
+        io = symInfo.indexOffset;
+        size = symInfo.size;
+        typeName = symInfo.typeName;
       }
 
       const valueBuf = encodeValue(typeName, size, msg.payload);
