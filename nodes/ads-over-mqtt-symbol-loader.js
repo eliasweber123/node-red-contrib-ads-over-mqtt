@@ -93,19 +93,20 @@ module.exports = function (RED) {
         const indexOffset = buffer.readUInt32LE(offset + 8);
         const size = buffer.readUInt32LE(offset + 12);
         const dataType = buffer.readUInt32LE(offset + 16);
+        const flags = buffer.readUInt32LE(offset + 20);
         const nameLength = buffer.readUInt16LE(offset + 24);
         const typeLength = buffer.readUInt16LE(offset + 26);
-        // const commentLength = buffer.readUInt16LE(offset + 28);
+        const commentLength = buffer.readUInt16LE(offset + 28);
         const nameStart = offset + 30;
         const name = buffer
-          .slice(nameStart, nameStart + nameLength - 1)
-          .toString("utf8");
+          .slice(nameStart, nameStart + nameLength)
+          .toString("utf8")
+          .replace(/\0.*$/, "");
         const typeName = buffer
-          .slice(
-            nameStart + nameLength,
-            nameStart + nameLength + typeLength - 1
-          )
-          .toString("utf8");
+          .slice(nameStart + nameLength, nameStart + nameLength + typeLength)
+          .toString("utf8")
+          .replace(/\0.*$/, "");
+        // Skip comment and any padding by relying on entryLen for the next offset
         symbols.push({
           name,
           indexGroup,
@@ -113,6 +114,7 @@ module.exports = function (RED) {
           size,
           typeName,
           dataType,
+          flags,
         });
         offset += entryLen;
       }
