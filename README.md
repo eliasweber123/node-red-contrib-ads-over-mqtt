@@ -28,6 +28,9 @@ ADS symbols using MQTT messages.
   Type which take precedence over cached values.
 - **ads-over-mqtt-info** – publishes a static info message to
   `<topic>/<localAmsNetId>/info` when triggered via its button.
+- **ads-over-mqtt-gvl** – liest per Sum-Read alle Symbole, deren Name mit einem
+  der konfigurierten GVL-Präfixe beginnt. Die Roh-Response des Sum-Reads wird
+  auf dem ersten Ausgang ausgegeben.
 
 These nodes publish requests to `<topic>/<targetAmsNetId>/ams` and listen
 for responses on `<topic>/<sourceAmsNetId>/ams/res`. The `<targetAmsNetId>`
