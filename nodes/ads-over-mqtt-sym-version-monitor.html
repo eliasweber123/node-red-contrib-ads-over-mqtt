@@ -6,11 +6,12 @@
       name: { value: "" },
       connection: { type: "ads-over-mqtt-client-connection", required: true },
       interval: { value: 1, validate: RED.validators.number() },
-      unit: { value: "s" }
+      unit: { value: "s" },
+      polling: { value: true }
     },
     inputs: 1,
     outputs: 3,
-    outputLabels: ["events", "res buffer", "online status"],
+    outputLabels: ["events", "debug", "online status"],
     icon: 'bridge.png',
     label: function() {
       return this.name || 'ads sym monitor';
@@ -45,14 +46,19 @@
       <option value="min">min</option>
     </select>
   </div>
+  <div class="form-row">
+    <label>&nbsp;</label>
+    <input type="checkbox" id="node-input-polling" style="width:auto; margin-left:0;" checked>
+    <label for="node-input-polling" style="width:auto;">Zyklische Abfrage aktiv</label>
+  </div>
 </script>
 
 <script type="text/x-red" data-help-name="ads-over-mqtt-sym-version-monitor">
   <p>Monitors the ADS symbol table version and the target info topic.</p>
-  <p>Sending any message to the input triggers a one-off read of the current symbol version and immediately outputs the last known online state. The outputs are:</p>
+  <p>The node can poll the symbol version cyclically when <i>Zyklische Abfrage aktiv</i> is enabled. Sending any message to the input performs the same action as a polling tick. The outputs are:</p>
   <ul>
     <li><strong>Output 1</strong> – <code>"liste aktualisiert"</code> events when the symbol version increases or the target goes from offline to online.</li>
-    <li><strong>Output 2</strong> – raw AMS response buffer in <code>msg.payload</code> when requested.</li>
+    <li><strong>Output 2</strong> – debug information including the decoded symbol version for every read.</li>
     <li><strong>Output 3</strong> – boolean online status in <code>msg.payload</code> representing the latest known state.</li>
   </ul>
   <p>Use the button to simulate a boot and restart the monitoring.</p>
