@@ -40,10 +40,10 @@ module.exports = function (RED) {
       const msg = { payload: "liste aktualisiert", source };
       if (currentSymVersion !== undefined) msg.currentSymVersion = currentSymVersion;
       if (prevSymVersion !== undefined) msg.prevSymVersion = prevSymVersion;
-      node.send(msg);
+      node.send([msg, null, null]);
     }
 
-    function readSymVersion() {
+    function readSymVersion(callback) {
       const adsRead = Buffer.alloc(12);
       adsRead.writeUInt32LE(0xf008, 0);
       adsRead.writeUInt32LE(0, 4);
@@ -63,7 +63,7 @@ module.exports = function (RED) {
 
       const frame = Buffer.concat([amsHeader, adsRead]);
       const reqTopic = `${namespace}/${targetAms}/ams`;
-      node.pending[invokeId] = true;
+      node.pending[invokeId] = callback || true;
       client.publish(reqTopic, frame, { qos: 0, retain: false });
     }
 
@@ -75,6 +75,13 @@ module.exports = function (RED) {
     }
     node.restart = restart;
 
+    node.on("input", () => {
+      readSymVersion((current) => {
+        node.send([null, { payload: current }, null]);
+      });
+      node.send([null, null, { payload: !!lastOnline }]);
+    });
+
     client.on("message", (topic, message) => {
       if (topic === resTopic) {
         if (!Buffer.isBuffer(message) || message.length < 40) {
@@ -82,7 +89,8 @@ module.exports = function (RED) {
           return;
         }
         const invokeId = message.readUInt32LE(28);
-        if (!node.pending[invokeId]) return;
+        const cb = node.pending[invokeId];
+        if (!cb) return;
         delete node.pending[invokeId];
         const result = message.readUInt32LE(32);
         const len = message.readUInt32LE(36);
@@ -93,14 +101,18 @@ module.exports = function (RED) {
         }
         if (len >= 4) {
           const current = data.readUInt32LE(0);
-          if (lastSymVersion === undefined) {
-            lastSymVersion = current;
-            if (lastOnline !== undefined) {
-              node.status({ fill: "green", shape: "dot", text: "running / monitoring" });
+          if (typeof cb === "function") {
+            cb(current);
+          } else {
+            if (lastSymVersion === undefined) {
+              lastSymVersion = current;
+              if (lastOnline !== undefined) {
+                node.status({ fill: "green", shape: "dot", text: "running / monitoring" });
+              }
+            } else if (current > lastSymVersion) {
+              sendOutput("sym_version", current, lastSymVersion);
+              lastSymVersion = current;
             }
-          } else if (current > lastSymVersion) {
-            sendOutput("sym_version", current, lastSymVersion);
-            lastSymVersion = current;
           }
         }
       } else if (topic === infoTopic) {
