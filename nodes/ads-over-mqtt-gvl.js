@@ -143,15 +143,23 @@ module.exports = function (RED) {
         const subReqs = Buffer.alloc(m * 16);
         let writeOffset = 0;
         let totalRead = 0;
+        const effSizes = [];
         const ADSIGRP_SYM_VALBYHND = 0xf005;
         for (let i = 0; i < m; i++) {
           const sym = symbols[i];
+          let effSize = sym.size;
+          const tn = sym.typeName || "";
+          const mStr = tn.match(/STRING\((\d+)\)/i);
+          const mWStr = tn.match(/WSTRING\((\d+)\)/i);
+          if (mStr) effSize = parseInt(mStr[1], 10) + 1;
+          else if (mWStr) effSize = (parseInt(mWStr[1], 10) + 1) * 2;
+          effSizes.push(effSize);
           subReqs.writeUInt32LE(ADSIGRP_SYM_VALBYHND, writeOffset);
           subReqs.writeUInt32LE(handles[i], writeOffset + 4);
-          subReqs.writeUInt32LE(sym.size, writeOffset + 8);
+          subReqs.writeUInt32LE(effSize, writeOffset + 8);
           subReqs.writeUInt32LE(0, writeOffset + 12);
           writeOffset += 16;
-          totalRead += sym.size;
+          totalRead += effSize;
         }
         const IG_SUM_READ = 0xf080;
         const readLen = m * 4 + totalRead;
@@ -168,6 +176,8 @@ module.exports = function (RED) {
         node.pending[invokeId2] = {
           type: "read",
           symbols,
+          handles,
+          effSizes,
           send: pending.send,
           done: pending.done,
         };
@@ -182,13 +192,44 @@ module.exports = function (RED) {
             const rc = data.readUInt32LE(i * 4);
             if (rc === 0x711) invalid = true;
             else if (rc !== 0) {
-              node.error(`Read error for ${pending.symbols[i].name}: ${rc}`);
+              const sym = pending.symbols[i];
+              if (rc === 0x705) {
+                node.error(`Invalid size for ${sym.name} (expected ${pending.effSizes[i]})`);
+              } else {
+                node.error(`Read error for ${sym.name}: ${rc}`);
+              }
             }
           }
         }
         if (invalid) {
           if (pending.send) pending.send([null, { payload: "Invalid symbol version" }]);
           else node.send([null, { payload: "Invalid symbol version" }]);
+        }
+        if (pending.handles && pending.handles.length) {
+          const m = pending.handles.length;
+          const subReqs = Buffer.alloc(m * 16);
+          const handleBuf = Buffer.alloc(m * 4);
+          const ADSIGRP_SYM_RELEASEHND = 0xf006;
+          let wOff = 0;
+          for (let i = 0; i < m; i++) {
+            subReqs.writeUInt32LE(ADSIGRP_SYM_RELEASEHND, wOff);
+            subReqs.writeUInt32LE(0, wOff + 4);
+            subReqs.writeUInt32LE(0, wOff + 8);
+            subReqs.writeUInt32LE(4, wOff + 12);
+            handleBuf.writeUInt32LE(pending.handles[i], i * 4);
+            wOff += 16;
+          }
+          const IG_SUM_WRITE = 0xf081;
+          const adsRw = Buffer.alloc(16);
+          adsRw.writeUInt32LE(IG_SUM_WRITE, 0);
+          adsRw.writeUInt32LE(m, 4);
+          adsRw.writeUInt32LE(m * 4, 8);
+          adsRw.writeUInt32LE(subReqs.length + handleBuf.length, 12);
+          const payload = Buffer.concat([adsRw, subReqs, handleBuf]);
+          const amsHeader = buildAmsHeader(payload.length, 0x0009);
+          const frame = Buffer.concat([amsHeader, payload]);
+          const reqTopic = `${namespace}/${targetAms}/ams`;
+          client.publish(reqTopic, frame, { qos: 0, retain: false });
         }
         if (pending.done) pending.done();
       }
