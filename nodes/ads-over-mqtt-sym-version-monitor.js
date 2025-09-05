@@ -5,6 +5,7 @@ module.exports = function (RED) {
     node.connection = RED.nodes.getNode(config.connection);
     node.interval = Number(config.interval) || 1;
     node.unit = config.unit || "s";
+    node.polling = config.polling !== false;
     let intervalMs = node.interval;
     if (node.unit === "ms") intervalMs = node.interval;
     else if (node.unit === "min") intervalMs = node.interval * 60000;
@@ -46,7 +47,10 @@ module.exports = function (RED) {
     const ADSIGRP_SYM_VERSION = 0xf008;
     const SYM_VERSION_LENGTH = 4;
 
-    function readSymVersion(callback) {
+    function readSymVersion(source) {
+      node.debug(
+        `REQ IG=0x${ADSIGRP_SYM_VERSION.toString(16)} IO=0 LEN=${SYM_VERSION_LENGTH}`
+      );
       const adsRead = Buffer.alloc(12);
       adsRead.writeUInt32LE(ADSIGRP_SYM_VERSION, 0);
       adsRead.writeUInt32LE(0, 4);
@@ -61,29 +65,33 @@ module.exports = function (RED) {
       amsHeader.writeUInt16LE(0x0004, 18); // State flags
       amsHeader.writeUInt32LE(adsRead.length, 20);
       amsHeader.writeUInt32LE(0, 24);
-      const invokeId = node._invokeId++ & 0xffffffff;
+      const invokeId = (node._invokeId++ & 0xffffffff) >>> 0;
       amsHeader.writeUInt32LE(invokeId, 28);
 
       const frame = Buffer.concat([amsHeader, adsRead]);
       const reqTopic = `${namespace}/${targetAms}/ams`;
-      node.pending[invokeId] = callback || true;
+      node.pending[invokeId] = source || "poll";
       client.publish(reqTopic, frame, { qos: 0, retain: false });
+    }
+
+    function tick(source) {
+      readSymVersion(source);
     }
 
     function restart() {
       lastSymVersion = undefined;
       lastOnline = undefined;
-      node.status({ fill: "grey", shape: "ring", text: "waiting info" });
-      readSymVersion();
+      if (node.polling) {
+        node.status({ fill: "grey", shape: "ring", text: "waiting info" });
+        tick("poll");
+      } else {
+        node.status({ fill: "grey", shape: "ring", text: "polling off" });
+      }
     }
     node.restart = restart;
 
     node.on("input", () => {
-      readSymVersion((buffer) => {
-        const secondOutputMsg = { payload: buffer };
-        node.send([null, secondOutputMsg, null]);
-      });
-      node.send([null, null, { payload: !!lastOnline }]);
+      tick("inject");
     });
 
     client.on("message", (topic, message) => {
@@ -92,33 +100,43 @@ module.exports = function (RED) {
           node.error("Invalid AMS response frame");
           return;
         }
+        const cmdId = message.readUInt16LE(16);
+        if (cmdId !== 0x0002) return;
         const invokeId = message.readUInt32LE(28);
-        const cb = node.pending[invokeId];
-        if (!cb) return;
+        const source = node.pending[invokeId];
+        if (!source) return;
         delete node.pending[invokeId];
         const result = message.readUInt32LE(32);
         const len = message.readUInt32LE(36);
+        node.debug(
+          `RES IG=0x${ADSIGRP_SYM_VERSION.toString(16)} IO=0 LEN=${len} RESULT=${result}`
+        );
         const data = message.slice(40, 40 + len);
+        let current;
+        let firstMsg = null;
         if (result !== 0) {
-          node.status({ fill: "red", shape: "dot", text: "ADS error " + result });
-          const errorMsg = { payload: "ADS read error: " + result };
-          node.error(errorMsg.payload);
-          node.send([errorMsg, null, null]);
-          return;
-        }
-        if (len !== SYM_VERSION_LENGTH) {
-          const errorMsg = {
-            payload: `ADS sym_version length mismatch: ${len}`,
-          };
-          node.status({ fill: "red", shape: "dot", text: errorMsg.payload });
-          node.error(errorMsg.payload);
-          node.send([errorMsg, null, null]);
-          return;
-        }
-        if (typeof cb === "function") {
-          cb(message);
+          firstMsg = { payload: "ADS read error: " + result };
+          node.status({ fill: "red", shape: "dot", text: firstMsg.payload });
+          node.error(firstMsg.payload);
+        } else if (len !== SYM_VERSION_LENGTH) {
+          firstMsg = { payload: `ADS sym_version length mismatch: ${len}` };
+          node.status({ fill: "red", shape: "dot", text: firstMsg.payload });
+          node.error(firstMsg.payload);
         } else {
-          const current = data.readUInt32LE(0);
+          current = data.readUInt32LE(0);
+        }
+        if (firstMsg) {
+          node.send([firstMsg, null, null]);
+        }
+        const debugMsg = {
+          payload: current,
+          buffer: data,
+          len,
+          result,
+          source,
+        };
+        node.send([null, debugMsg, { payload: !!lastOnline }]);
+        if (current !== undefined) {
           if (lastSymVersion === undefined) {
             lastSymVersion = current;
             if (lastOnline !== undefined) {
@@ -143,17 +161,28 @@ module.exports = function (RED) {
           }
           lastOnline = currentOnline;
           if (lastSymVersion !== undefined) {
-            node.status({ fill: "green", shape: "dot", text: "running / monitoring" });
+            node.status({
+              fill: "green",
+              shape: "dot",
+              text: "running / monitoring",
+            });
           }
         } else {
-          node.status({ fill: "yellow", shape: "ring", text: "warte auf erstes Info-Topic" });
+          node.status({
+            fill: "yellow",
+            shape: "ring",
+            text: "warte auf erstes Info-Topic",
+          });
         }
       }
     });
 
-    const timer = setInterval(readSymVersion, intervalMs);
+    let timer;
+    if (node.polling) {
+      timer = setInterval(() => tick("poll"), intervalMs);
+    }
     node.on("close", () => {
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
       client.unsubscribe(infoTopic);
     });
 
