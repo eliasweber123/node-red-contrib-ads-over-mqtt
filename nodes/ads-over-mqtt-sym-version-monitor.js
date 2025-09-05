@@ -76,8 +76,8 @@ module.exports = function (RED) {
     node.restart = restart;
 
     node.on("input", () => {
-      readSymVersion((current) => {
-        const secondOutputMsg = { payload: current.toString() };
+      readSymVersion((buffer) => {
+        const secondOutputMsg = { payload: buffer };
         node.send([null, secondOutputMsg, null]);
       });
       node.send([null, null, { payload: !!lastOnline }]);
@@ -103,20 +103,18 @@ module.exports = function (RED) {
           node.send([errorMsg, null, null]);
           return;
         }
-        if (len >= 4) {
+        if (typeof cb === "function") {
+          cb(message);
+        } else if (len >= 4) {
           const current = data.readUInt32LE(0);
-          if (typeof cb === "function") {
-            cb(current);
-          } else {
-            if (lastSymVersion === undefined) {
-              lastSymVersion = current;
-              if (lastOnline !== undefined) {
-                node.status({ fill: "green", shape: "dot", text: "running / monitoring" });
-              }
-            } else if (current > lastSymVersion) {
-              sendOutput("sym_version", current, lastSymVersion);
-              lastSymVersion = current;
+          if (lastSymVersion === undefined) {
+            lastSymVersion = current;
+            if (lastOnline !== undefined) {
+              node.status({ fill: "green", shape: "dot", text: "running / monitoring" });
             }
+          } else if (current > lastSymVersion) {
+            sendOutput("sym_version", current, lastSymVersion);
+            lastSymVersion = current;
           }
         }
       } else if (topic === infoTopic) {
