@@ -5,7 +5,7 @@
     defaults: {
       name: { value: "" },
       connection: { type: "ads-over-mqtt-client-connection", required: true },
-      gvls: { value: [] },
+      gvlPrefixes: { value: "" },
       cycle: { value: false },
       interval: { value: 1 },
       unit: { value: "s" }
@@ -18,17 +18,8 @@
       return this.name || 'ads gvl';
     },
     oneditprepare: function() {
-      var gvlsList = $("#node-input-gvls").editableList({
-        addItem: function(container, i, data) {
-          var row = $('<input/>', { type: 'text', style: 'width: 100%;' })
-            .appendTo(container);
-          row.val(data.gvl || '');
-        },
-        removable: true
-      });
-      (this.gvls || []).forEach(function(g){
-        gvlsList.editableList('addItem', { gvl: g });
-      });
+      var existing = this.gvlPrefixes || (Array.isArray(this.gvls) ? this.gvls.join(';') : '');
+      $("#node-input-gvlPrefixes").val(existing);
       function toggleCycle() {
         var show = $("#node-input-cycle").is(':checked');
         $(".ads-cycle").toggle(show);
@@ -37,12 +28,7 @@
       toggleCycle();
     },
     oneditsave: function() {
-      var gvls = [];
-      $("#node-input-gvls").editableList('items').each(function(i, item){
-        var v = $(item).find('input').val();
-        if (v) gvls.push(v);
-      });
-      this.gvls = gvls;
+      this.gvlPrefixes = $("#node-input-gvlPrefixes").val();
     }
   });
 </script>
@@ -57,8 +43,8 @@
     <input type="text" id="node-input-connection">
   </div>
   <div class="form-row">
-    <label for="node-input-gvls"><i class="fa fa-list"></i> GVL Prefixe</label>
-    <ol id="node-input-gvls" style="min-height: 100px;"></ol>
+    <label for="node-input-gvlPrefixes"><i class="fa fa-list"></i> GVL's Prefixe</label>
+    <input type="text" id="node-input-gvlPrefixes">
   </div>
   <div class="form-row">
     <label>&nbsp;</label>

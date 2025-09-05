@@ -2,7 +2,9 @@ module.exports = function (RED) {
   function AdsOverMqttGvl(config) {
     RED.nodes.createNode(this, config);
     const node = this;
-    node.gvls = config.gvls || [];
+    const prefixStr = config.gvlPrefixes || (Array.isArray(config.gvls) ? config.gvls.join(';') : '');
+    node.gvlPrefixes = prefixStr;
+    node.gvls = Array.from(new Set(prefixStr.split(/[;,]/).map(p => p.trim()).filter(p => p)));
     node.cycle = config.cycle === true || config.cycle === "true";
     node.interval = Number(config.interval) || 1;
     node.unit = config.unit || "s";
@@ -54,7 +56,7 @@ module.exports = function (RED) {
       const symbolsMap = flowContext.get("symbols") || {};
       const key = `${namespace}/${targetAms}`;
       const allSymbols = symbolsMap[key] || [];
-      const prefixes = (node.gvls || []).filter((p) => p).map((p) => p.trim());
+      const prefixes = node.gvls;
       const symbols = allSymbols.filter((s) =>
         prefixes.some((p) => s.name.startsWith(`${p}.`))
       );
