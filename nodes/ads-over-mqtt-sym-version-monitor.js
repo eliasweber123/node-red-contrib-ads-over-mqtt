@@ -77,7 +77,8 @@ module.exports = function (RED) {
 
     node.on("input", () => {
       readSymVersion((current) => {
-        node.send([null, { payload: current }, null]);
+        const secondOutputMsg = { payload: current.toString() };
+        node.send([null, secondOutputMsg, null]);
       });
       node.send([null, null, { payload: !!lastOnline }]);
     });
@@ -96,7 +97,10 @@ module.exports = function (RED) {
         const len = message.readUInt32LE(36);
         const data = message.slice(40, 40 + len);
         if (result !== 0) {
-          sendOutput("sym_version");
+          node.status({ fill: "red", shape: "dot", text: "ADS error " + result });
+          const errorMsg = { payload: "ADS read error: " + result };
+          node.error(errorMsg.payload);
+          node.send([errorMsg, null, null]);
           return;
         }
         if (len >= 4) {
