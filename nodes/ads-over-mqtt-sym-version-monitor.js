@@ -28,7 +28,7 @@ module.exports = function (RED) {
     }
     client.subscribe(infoTopic);
 
-    let lastSymVersion;
+    let lastSymVersionByte;
     let lastOnline;
     node._invokeId = 1;
     node.pending = {};
@@ -45,7 +45,7 @@ module.exports = function (RED) {
     }
 
     const ADSIGRP_SYM_VERSION = 0xf008;
-    const SYM_VERSION_LENGTH = 4;
+    const SYM_VERSION_LENGTH = 1;
 
     function readSymVersion(source) {
       node.debug(
@@ -79,7 +79,7 @@ module.exports = function (RED) {
     }
 
     function restart() {
-      lastSymVersion = undefined;
+      lastSymVersionByte = undefined;
       lastOnline = undefined;
       if (node.polling) {
         node.status({ fill: "grey", shape: "ring", text: "waiting info" });
@@ -123,22 +123,22 @@ module.exports = function (RED) {
           node.status({ fill: "red", shape: "dot", text: firstMsg.payload });
           node.error(firstMsg.payload);
         } else {
-          current = data.readUInt32LE(0);
+          current = data.readUInt8(0);
         }
         if (firstMsg) {
           node.send([firstMsg, null, null]);
         }
         const debugMsg = {
-          payload: current,
-          buffer: data,
+          payload: data,
           len,
           result,
           source,
+          value: current,
         };
         node.send([null, debugMsg, { payload: !!lastOnline }]);
         if (current !== undefined) {
-          if (lastSymVersion === undefined) {
-            lastSymVersion = current;
+          if (lastSymVersionByte === undefined) {
+            lastSymVersionByte = current;
             if (lastOnline !== undefined) {
               node.status({
                 fill: "green",
@@ -146,9 +146,9 @@ module.exports = function (RED) {
                 text: "running / monitoring",
               });
             }
-          } else if (current > lastSymVersion) {
-            sendOutput("sym_version", current, lastSymVersion);
-            lastSymVersion = current;
+          } else if (current !== lastSymVersionByte) {
+            sendOutput("sym_version", current, lastSymVersionByte);
+            lastSymVersionByte = current;
           }
         }
       } else if (topic === infoTopic) {
@@ -160,7 +160,7 @@ module.exports = function (RED) {
             sendOutput("infoTopic");
           }
           lastOnline = currentOnline;
-          if (lastSymVersion !== undefined) {
+          if (lastSymVersionByte !== undefined) {
             node.status({
               fill: "green",
               shape: "dot",

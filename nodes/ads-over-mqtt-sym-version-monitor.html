@@ -57,8 +57,8 @@
   <p>Monitors the ADS symbol table version and the target info topic.</p>
   <p>The node can poll the symbol version cyclically when <i>Zyklische Abfrage aktiv</i> is enabled. Sending any message to the input performs the same action as a polling tick. The outputs are:</p>
   <ul>
-    <li><strong>Output 1</strong> – <code>"liste aktualisiert"</code> events when the symbol version increases or the target goes from offline to online.</li>
-    <li><strong>Output 2</strong> – debug information including the decoded symbol version for every read.</li>
+    <li><strong>Output 1</strong> – <code>"liste aktualisiert"</code> events when the symbol version changes or the target goes from offline to online.</li>
+    <li><strong>Output 2</strong> – debug information with the raw ADS response buffer in <code>msg.payload</code> and the decoded symbol version byte in <code>msg.value</code>.</li>
     <li><strong>Output 3</strong> – boolean online status in <code>msg.payload</code> representing the latest known state.</li>
   </ul>
   <p>Use the button to simulate a boot and restart the monitoring.</p>
