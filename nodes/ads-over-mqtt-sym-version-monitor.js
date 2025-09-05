@@ -43,11 +43,14 @@ module.exports = function (RED) {
       node.send([msg, null, null]);
     }
 
+    const ADSIGRP_SYM_VERSION = 0xf008;
+    const SYM_VERSION_LENGTH = 4;
+
     function readSymVersion(callback) {
       const adsRead = Buffer.alloc(12);
-      adsRead.writeUInt32LE(0xf008, 0);
+      adsRead.writeUInt32LE(ADSIGRP_SYM_VERSION, 0);
       adsRead.writeUInt32LE(0, 4);
-      adsRead.writeUInt32LE(4, 8);
+      adsRead.writeUInt32LE(SYM_VERSION_LENGTH, 8);
 
       const amsHeader = Buffer.alloc(32);
       amsNetIdToBuffer(targetAms).copy(amsHeader, 0);
@@ -103,14 +106,27 @@ module.exports = function (RED) {
           node.send([errorMsg, null, null]);
           return;
         }
+        if (len !== SYM_VERSION_LENGTH) {
+          const errorMsg = {
+            payload: `ADS sym_version length mismatch: ${len}`,
+          };
+          node.status({ fill: "red", shape: "dot", text: errorMsg.payload });
+          node.error(errorMsg.payload);
+          node.send([errorMsg, null, null]);
+          return;
+        }
         if (typeof cb === "function") {
           cb(message);
-        } else if (len >= 4) {
+        } else {
           const current = data.readUInt32LE(0);
           if (lastSymVersion === undefined) {
             lastSymVersion = current;
             if (lastOnline !== undefined) {
-              node.status({ fill: "green", shape: "dot", text: "running / monitoring" });
+              node.status({
+                fill: "green",
+                shape: "dot",
+                text: "running / monitoring",
+              });
             }
           } else if (current > lastSymVersion) {
             sendOutput("sym_version", current, lastSymVersion);
